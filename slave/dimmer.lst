@@ -1,0 +1,900 @@
+   1               		.file	"dimmer.c"
+   2               	__SP_H__ = 0x3e
+   3               	__SP_L__ = 0x3d
+   4               	__SREG__ = 0x3f
+   5               	__tmp_reg__ = 0
+   6               	__zero_reg__ = 1
+   7               		.text
+   8               	.Ltext0:
+   9               	.global	initIO
+  11               	initIO:
+  12               	.LFB7:
+  13               		.file 1 "dimmer.c"
+   1:dimmer.c      **** #include <avr/io.h>
+   2:dimmer.c      **** #include <avr/interrupt.h>
+   3:dimmer.c      **** #include <avr/pgmspace.h>
+   4:dimmer.c      **** #include <avr/eeprom.h>
+   5:dimmer.c      **** #include <avr/wdt.h>
+   6:dimmer.c      **** 
+   7:dimmer.c      **** #include <util/delay.h>
+   8:dimmer.c      **** 
+   9:dimmer.c      **** #define DIMMER_COUNT 2
+  10:dimmer.c      **** #define TRUE 1
+  11:dimmer.c      **** #define FALSE 0
+  12:dimmer.c      **** 
+  13:dimmer.c      **** #define MAX_SIZE 2048
+  14:dimmer.c      **** 
+  15:dimmer.c      **** struct dimmer {
+  16:dimmer.c      **** 	volatile uint8_t level_cur;
+  17:dimmer.c      **** 	volatile uint8_t level_req;
+  18:dimmer.c      **** 	volatile uint8_t *port;
+  19:dimmer.c      **** 	uint8_t mask;	
+  20:dimmer.c      **** } dimmers[DIMMER_COUNT];
+  21:dimmer.c      **** 
+  22:dimmer.c      **** void initIO (void)
+  23:dimmer.c      **** {
+  14               		.loc 1 23 0
+  15               	/* prologue: function */
+  16               	/* frame size = 0 */
+  17               	/* stack size = 0 */
+  18               	.L__stack_usage = 0
+  24:dimmer.c      **** 	//Set up the Data Direction Register
+  25:dimmer.c      **** 	DDRC = 0xFF;
+  19               		.loc 1 25 0
+  20 0000 8FEF      		ldi r24,lo8(-1)
+  21 0002 87B9      		out 0x7,r24
+  26:dimmer.c      **** 	//Set the triacs off.
+  27:dimmer.c      **** 	PORTC = 0x00;
+  22               		.loc 1 27 0
+  23 0004 18B8      		out 0x8,__zero_reg__
+  28:dimmer.c      **** 	
+  29:dimmer.c      **** 	//INT0 - ZCD
+  30:dimmer.c      **** 	EICRA = (1<<ISC01) | (0<<ISC00);
+  24               		.loc 1 30 0
+  25 0006 82E0      		ldi r24,lo8(2)
+  26 0008 8093 6900 		sts 105,r24
+  31:dimmer.c      **** 	EIMSK |= (1<<INT0);
+  27               		.loc 1 31 0
+  28 000c E89A      		sbi 0x1d,0
+  32:dimmer.c      **** 
+  33:dimmer.c      **** 	//Dimming Timer (TODO: Enable/Disable on Dimming request).
+  34:dimmer.c      **** 	TCCR0A = 	(1 << WGM01);
+  29               		.loc 1 34 0
+  30 000e 84BD      		out 0x24,r24
+  35:dimmer.c      **** 	TCCR0B = 	((1 << CS02) | (1 << CS00));		// CTC Mode - Prescaler 1024
+  31               		.loc 1 35 0
+  32 0010 95E0      		ldi r25,lo8(5)
+  33 0012 95BD      		out 0x25,r25
+  36:dimmer.c      **** 	OCR0A = 	156;								// ~10ms
+  34               		.loc 1 36 0
+  35 0014 9CE9      		ldi r25,lo8(-100)
+  36 0016 97BD      		out 0x27,r25
+  37:dimmer.c      **** 	TIMSK0 = 	(1 << OCIE0A);
+  37               		.loc 1 37 0
+  38 0018 8093 6E00 		sts 110,r24
+  38:dimmer.c      **** 
+  39:dimmer.c      **** 	//Set up SPI
+  40:dimmer.c      **** 	DDRB &= ~((1<<2)|(1<<3)|(1<<5));   // SCK, MOSI and SS as inputs
+  39               		.loc 1 40 0
+  40 001c 84B1      		in r24,0x4
+  41 001e 837D      		andi r24,lo8(-45)
+  42 0020 84B9      		out 0x4,r24
+  41:dimmer.c      ****     DDRB |= (1<<4);                    // MISO as output
+  43               		.loc 1 41 0
+  44 0022 249A      		sbi 0x4,4
+  42:dimmer.c      **** 
+  43:dimmer.c      ****     SPCR &= ~(1<<MSTR);                // Set as slave 
+  45               		.loc 1 43 0
+  46 0024 8CB5      		in r24,0x2c
+  47 0026 8F7E      		andi r24,lo8(-17)
+  48 0028 8CBD      		out 0x2c,r24
+  44:dimmer.c      ****     SPCR |= (1<<SPR0)|(1<<SPR1);       // divide clock by 128
+  49               		.loc 1 44 0
+  50 002a 8CB5      		in r24,0x2c
+  51 002c 8360      		ori r24,lo8(3)
+  52 002e 8CBD      		out 0x2c,r24
+  45:dimmer.c      ****     SPCR |= (1<<SPE);                  // Enable SPI
+  53               		.loc 1 45 0
+  54 0030 8CB5      		in r24,0x2c
+  55 0032 8064      		ori r24,lo8(64)
+  56 0034 8CBD      		out 0x2c,r24
+  46:dimmer.c      **** 
+  47:dimmer.c      **** 	sei();
+  57               		.loc 1 47 0
+  58               	/* #APP */
+  59               	 ;  47 "dimmer.c" 1
+  60 0036 7894      		sei
+  61               	 ;  0 "" 2
+  62               	/* #NOAPP */
+  63 0038 0895      		ret
+  64               	.LFE7:
+  66               	.global	initDimmers
+  68               	initDimmers:
+  69               	.LFB8:
+  48:dimmer.c      **** }
+  49:dimmer.c      **** 
+  50:dimmer.c      **** void initDimmers(void) {
+  70               		.loc 1 50 0
+  71               	/* prologue: function */
+  72               	/* frame size = 0 */
+  73               	/* stack size = 0 */
+  74               	.L__stack_usage = 0
+  51:dimmer.c      **** 	dimmers[0].level_cur = 0;
+  75               		.loc 1 51 0
+  76 003a 1092 0000 		sts dimmers,__zero_reg__
+  52:dimmer.c      **** 	dimmers[0].level_req = 0;
+  77               		.loc 1 52 0
+  78 003e 1092 0000 		sts dimmers+1,__zero_reg__
+  53:dimmer.c      **** 	dimmers[0].port = &PORTC;
+  79               		.loc 1 53 0
+  80 0042 88E2      		ldi r24,lo8(40)
+  81 0044 90E0      		ldi r25,0
+  82 0046 9093 0000 		sts dimmers+2+1,r25
+  83 004a 8093 0000 		sts dimmers+2,r24
+  54:dimmer.c      **** 	dimmers[0].mask = 0x01;
+  84               		.loc 1 54 0
+  85 004e 21E0      		ldi r18,lo8(1)
+  86 0050 2093 0000 		sts dimmers+4,r18
+  55:dimmer.c      **** 	
+  56:dimmer.c      **** 	dimmers[1].level_cur = 0;
+  87               		.loc 1 56 0
+  88 0054 1092 0000 		sts dimmers+5,__zero_reg__
+  57:dimmer.c      **** 	dimmers[1].level_req = 0;
+  89               		.loc 1 57 0
+  90 0058 1092 0000 		sts dimmers+6,__zero_reg__
+  58:dimmer.c      **** 	dimmers[1].port = &PORTC;
+  91               		.loc 1 58 0
+  92 005c 9093 0000 		sts dimmers+7+1,r25
+  93 0060 8093 0000 		sts dimmers+7,r24
+  59:dimmer.c      **** 	dimmers[1].mask = 0x02;
+  94               		.loc 1 59 0
+  95 0064 82E0      		ldi r24,lo8(2)
+  96 0066 8093 0000 		sts dimmers+9,r24
+  97 006a 0895      		ret
+  98               	.LFE8:
+ 100               	.global	rampToLevel
+ 102               	rampToLevel:
+ 103               	.LFB10:
+  60:dimmer.c      **** }
+  61:dimmer.c      **** 
+  62:dimmer.c      **** int main (void)
+  63:dimmer.c      **** {
+  64:dimmer.c      **** 	initIO(); //Setup IO pins and defaults
+  65:dimmer.c      **** 	initDimmers(); //Set up the dimmers.
+  66:dimmer.c      **** 
+  67:dimmer.c      **** 	char data;
+  68:dimmer.c      **** 
+  69:dimmer.c      **** 	while(1) {
+  70:dimmer.c      **** 		while(!(SPSR & (1<<SPIF)));    // wait until all data is received
+  71:dimmer.c      ****         data = SPDR;                   // hurray, we now have our data
+  72:dimmer.c      **** 
+  73:dimmer.c      ****         int level = (int)data;
+  74:dimmer.c      **** 
+  75:dimmer.c      ****         rampToLevel(0, data);
+  76:dimmer.c      **** 	}
+  77:dimmer.c      **** 
+  78:dimmer.c      **** 	return(0);
+  79:dimmer.c      **** }
+  80:dimmer.c      **** 
+  81:dimmer.c      **** void rampToLevel(uint8_t index, int level) {
+ 104               		.loc 1 81 0
+ 105               	.LVL0:
+ 106               	/* prologue: function */
+ 107               	/* frame size = 0 */
+ 108               	/* stack size = 0 */
+ 109               	.L__stack_usage = 0
+  82:dimmer.c      **** 	if(level > 255)
+ 110               		.loc 1 82 0
+ 111 006c 6F3F      		cpi r22,-1
+ 112 006e 7105      		cpc r23,__zero_reg__
+ 113 0070 01F0      		breq .+2
+ 114 0072 04F4      		brge .L6
+  83:dimmer.c      **** 		level = 255;
+  84:dimmer.c      **** 	
+  85:dimmer.c      **** 	if(level < 0 ) 
+ 115               		.loc 1 85 0
+ 116 0074 77FD      		sbrc r23,7
+ 117 0076 00C0      		rjmp .L7
+ 118 0078 00C0      		rjmp .L5
+ 119               	.L6:
+  83:dimmer.c      **** 		level = 255;
+ 120               		.loc 1 83 0
+ 121 007a 6FEF      		ldi r22,lo8(-1)
+ 122 007c 70E0      		ldi r23,0
+ 123               	.LVL1:
+ 124 007e 00C0      		rjmp .L5
+ 125               	.LVL2:
+ 126               	.L7:
+  86:dimmer.c      **** 		level = 0;
+ 127               		.loc 1 86 0
+ 128 0080 60E0      		ldi r22,0
+ 129 0082 70E0      		ldi r23,0
+ 130               	.LVL3:
+ 131               	.L5:
+  87:dimmer.c      **** 	
+  88:dimmer.c      **** 	dimmers[index].level_req = level;
+ 132               		.loc 1 88 0
+ 133 0084 95E0      		ldi r25,lo8(5)
+ 134 0086 899F      		mul r24,r25
+ 135 0088 F001      		movw r30,r0
+ 136 008a 1124      		clr __zero_reg__
+ 137 008c E050      		subi r30,lo8(-(dimmers))
+ 138 008e F040      		sbci r31,hi8(-(dimmers))
+ 139 0090 6183      		std Z+1,r22
+ 140 0092 0895      		ret
+ 141               	.LFE10:
+ 143               		.section	.text.startup,"ax",@progbits
+ 144               	.global	main
+ 146               	main:
+ 147               	.LFB9:
+  63:dimmer.c      **** {
+ 148               		.loc 1 63 0
+ 149               	/* prologue: function */
+ 150               	/* frame size = 0 */
+ 151               	/* stack size = 0 */
+ 152               	.L__stack_usage = 0
+  64:dimmer.c      **** 	initIO(); //Setup IO pins and defaults
+ 153               		.loc 1 64 0
+ 154 0000 00D0      		rcall initIO
+ 155               	.LVL4:
+  65:dimmer.c      **** 	initDimmers(); //Set up the dimmers.
+ 156               		.loc 1 65 0
+ 157 0002 00D0      		rcall initDimmers
+ 158               	.LVL5:
+ 159               	.L13:
+ 160               	.LBB5:
+  70:dimmer.c      **** 		while(!(SPSR & (1<<SPIF)));    // wait until all data is received
+ 161               		.loc 1 70 0 discriminator 1
+ 162 0004 0DB4      		in __tmp_reg__,0x2d
+ 163 0006 07FE      		sbrs __tmp_reg__,7
+ 164 0008 00C0      		rjmp .L13
+  71:dimmer.c      ****         data = SPDR;                   // hurray, we now have our data
+ 165               		.loc 1 71 0
+ 166 000a 6EB5      		in r22,0x2e
+ 167               	.LVL6:
+  75:dimmer.c      ****         rampToLevel(0, data);
+ 168               		.loc 1 75 0
+ 169 000c 70E0      		ldi r23,0
+ 170 000e 80E0      		ldi r24,0
+ 171 0010 90E0      		ldi r25,0
+ 172 0012 00D0      		rcall rampToLevel
+ 173               	.LVL7:
+ 174               	.LBE5:
+  76:dimmer.c      **** 	}
+ 175               		.loc 1 76 0
+ 176 0014 00C0      		rjmp .L13
+ 177               	.LFE9:
+ 179               		.text
+ 180               	.global	switchToLevel
+ 182               	switchToLevel:
+ 183               	.LFB11:
+  89:dimmer.c      **** 
+  90:dimmer.c      **** }
+  91:dimmer.c      **** 
+  92:dimmer.c      **** void switchToLevel(uint8_t index, int level) {
+ 184               		.loc 1 92 0
+ 185               	.LVL8:
+ 186               	/* prologue: function */
+ 187               	/* frame size = 0 */
+ 188               	/* stack size = 0 */
+ 189               	.L__stack_usage = 0
+  93:dimmer.c      **** 	if(level > 255)
+ 190               		.loc 1 93 0
+ 191 0094 6F3F      		cpi r22,-1
+ 192 0096 7105      		cpc r23,__zero_reg__
+ 193 0098 01F0      		breq .+2
+ 194 009a 04F4      		brge .L17
+  94:dimmer.c      **** 		level = 255;
+  95:dimmer.c      **** 	
+  96:dimmer.c      **** 	if(level < 0 ) 
+ 195               		.loc 1 96 0
+ 196 009c 77FD      		sbrc r23,7
+ 197 009e 00C0      		rjmp .L18
+ 198 00a0 00C0      		rjmp .L16
+ 199               	.L17:
+  94:dimmer.c      **** 		level = 255;
+ 200               		.loc 1 94 0
+ 201 00a2 6FEF      		ldi r22,lo8(-1)
+ 202 00a4 70E0      		ldi r23,0
+ 203               	.LVL9:
+ 204 00a6 00C0      		rjmp .L16
+ 205               	.LVL10:
+ 206               	.L18:
+  97:dimmer.c      **** 		level = 0;
+ 207               		.loc 1 97 0
+ 208 00a8 60E0      		ldi r22,0
+ 209 00aa 70E0      		ldi r23,0
+ 210               	.LVL11:
+ 211               	.L16:
+  98:dimmer.c      **** 
+  99:dimmer.c      **** 	dimmers[index].level_req = level;
+ 212               		.loc 1 99 0
+ 213 00ac 95E0      		ldi r25,lo8(5)
+ 214 00ae 899F      		mul r24,r25
+ 215 00b0 F001      		movw r30,r0
+ 216 00b2 1124      		clr __zero_reg__
+ 217 00b4 E050      		subi r30,lo8(-(dimmers))
+ 218 00b6 F040      		sbci r31,hi8(-(dimmers))
+ 219 00b8 6183      		std Z+1,r22
+ 100:dimmer.c      **** 	dimmers[index].level_cur = level;
+ 220               		.loc 1 100 0
+ 221 00ba 6083      		st Z,r22
+ 222 00bc 0895      		ret
+ 223               	.LFE11:
+ 225               	.global	__vector_1
+ 227               	__vector_1:
+ 228               	.LFB12:
+ 101:dimmer.c      **** }
+ 102:dimmer.c      **** 
+ 103:dimmer.c      **** volatile uint16_t count;
+ 104:dimmer.c      **** //Zero Cross Detection.
+ 105:dimmer.c      **** ISR(INT0_vect) {
+ 229               		.loc 1 105 0
+ 230 00be 1F92      		push r1
+ 231               	.LCFI0:
+ 232 00c0 0F92      		push r0
+ 233               	.LCFI1:
+ 234 00c2 0FB6      		in r0,__SREG__
+ 235 00c4 0F92      		push r0
+ 236 00c6 1124      		clr __zero_reg__
+ 237 00c8 8F93      		push r24
+ 238               	.LCFI2:
+ 239 00ca 9F93      		push r25
+ 240               	.LCFI3:
+ 241 00cc EF93      		push r30
+ 242               	.LCFI4:
+ 243 00ce FF93      		push r31
+ 244               	.LCFI5:
+ 245               	/* prologue: Signal */
+ 246               	/* frame size = 0 */
+ 247               	/* stack size = 7 */
+ 248               	.L__stack_usage = 7
+ 106:dimmer.c      **** 	count = 256;
+ 249               		.loc 1 106 0
+ 250 00d0 80E0      		ldi r24,0
+ 251 00d2 91E0      		ldi r25,lo8(1)
+ 252 00d4 9093 0000 		sts count+1,r25
+ 253 00d8 8093 0000 		sts count,r24
+ 107:dimmer.c      **** 
+ 108:dimmer.c      **** 	TCCR1B |= 	((1 << CS10) | (1 << WGM12));
+ 254               		.loc 1 108 0
+ 255 00dc E1E8      		ldi r30,lo8(-127)
+ 256 00de F0E0      		ldi r31,0
+ 257 00e0 8081      		ld r24,Z
+ 258 00e2 8960      		ori r24,lo8(9)
+ 259 00e4 8083      		st Z,r24
+ 109:dimmer.c      **** 	OCR1A = 	400;
+ 260               		.loc 1 109 0
+ 261 00e6 80E9      		ldi r24,lo8(-112)
+ 262 00e8 91E0      		ldi r25,lo8(1)
+ 263 00ea 9093 8900 		sts 136+1,r25
+ 264 00ee 8093 8800 		sts 136,r24
+ 110:dimmer.c      **** 	TIMSK1 |= 	(1 << OCIE1A);	
+ 265               		.loc 1 110 0
+ 266 00f2 EFE6      		ldi r30,lo8(111)
+ 267 00f4 F0E0      		ldi r31,0
+ 268 00f6 8081      		ld r24,Z
+ 269 00f8 8260      		ori r24,lo8(2)
+ 270 00fa 8083      		st Z,r24
+ 271               	/* epilogue start */
+ 111:dimmer.c      **** }
+ 272               		.loc 1 111 0
+ 273 00fc FF91      		pop r31
+ 274 00fe EF91      		pop r30
+ 275 0100 9F91      		pop r25
+ 276 0102 8F91      		pop r24
+ 277 0104 0F90      		pop r0
+ 278 0106 0FBE      		out __SREG__,r0
+ 279 0108 0F90      		pop r0
+ 280 010a 1F90      		pop r1
+ 281 010c 1895      		reti
+ 282               	.LFE12:
+ 284               	.global	__vector_11
+ 286               	__vector_11:
+ 287               	.LFB13:
+ 112:dimmer.c      **** 
+ 113:dimmer.c      **** //Zero Cross Timer Interrupt.
+ 114:dimmer.c      **** ISR(TIMER1_COMPA_vect) {
+ 288               		.loc 1 114 0
+ 289 010e 1F92      		push r1
+ 290               	.LCFI6:
+ 291 0110 0F92      		push r0
+ 292               	.LCFI7:
+ 293 0112 0FB6      		in r0,__SREG__
+ 294 0114 0F92      		push r0
+ 295 0116 1124      		clr __zero_reg__
+ 296 0118 2F93      		push r18
+ 297               	.LCFI8:
+ 298 011a 3F93      		push r19
+ 299               	.LCFI9:
+ 300 011c 4F93      		push r20
+ 301               	.LCFI10:
+ 302 011e 5F93      		push r21
+ 303               	.LCFI11:
+ 304 0120 6F93      		push r22
+ 305               	.LCFI12:
+ 306 0122 8F93      		push r24
+ 307               	.LCFI13:
+ 308 0124 9F93      		push r25
+ 309               	.LCFI14:
+ 310 0126 AF93      		push r26
+ 311               	.LCFI15:
+ 312 0128 BF93      		push r27
+ 313               	.LCFI16:
+ 314 012a CF93      		push r28
+ 315               	.LCFI17:
+ 316 012c DF93      		push r29
+ 317               	.LCFI18:
+ 318 012e EF93      		push r30
+ 319               	.LCFI19:
+ 320 0130 FF93      		push r31
+ 321               	.LCFI20:
+ 322               	/* prologue: Signal */
+ 323               	/* frame size = 0 */
+ 324               	/* stack size = 16 */
+ 325               	.L__stack_usage = 16
+ 115:dimmer.c      **** 	count--;
+ 326               		.loc 1 115 0
+ 327 0132 8091 0000 		lds r24,count
+ 328 0136 9091 0000 		lds r25,count+1
+ 329 013a 0197      		sbiw r24,1
+ 330 013c 9093 0000 		sts count+1,r25
+ 331 0140 8093 0000 		sts count,r24
+ 332               	.LVL12:
+ 333 0144 A0E0      		ldi r26,lo8(dimmers+2)
+ 334 0146 B0E0      		ldi r27,hi8(dimmers+2)
+ 335 0148 E0E0      		ldi r30,lo8(dimmers+4)
+ 336 014a F0E0      		ldi r31,hi8(dimmers+4)
+ 337 014c 80E0      		ldi r24,0
+ 338 014e 90E0      		ldi r25,0
+ 339               	.LBB6:
+ 116:dimmer.c      **** 	for(uint8_t i = 0; i < DIMMER_COUNT; i++) {
+ 117:dimmer.c      **** 		if(dimmers[i].level_cur > 0 && dimmers[i].level_cur >= count) {
+ 340               		.loc 1 117 0
+ 341 0150 65E0      		ldi r22,lo8(5)
+ 342               	.LVL13:
+ 343               	.L22:
+ 344 0152 689F      		mul r22,r24
+ 345 0154 E001      		movw r28,r0
+ 346 0156 699F      		mul r22,r25
+ 347 0158 D00D      		add r29,r0
+ 348 015a 1124      		clr __zero_reg__
+ 349 015c C050      		subi r28,lo8(-(dimmers))
+ 350 015e D040      		sbci r29,hi8(-(dimmers))
+ 351 0160 2881      		ld r18,Y
+ 352 0162 2223      		tst r18
+ 353 0164 01F0      		breq .L21
+ 354               		.loc 1 117 0 is_stmt 0 discriminator 1
+ 355 0166 4881      		ld r20,Y
+ 356 0168 2091 0000 		lds r18,count
+ 357 016c 3091 0000 		lds r19,count+1
+ 358 0170 50E0      		ldi r21,0
+ 359 0172 4217      		cp r20,r18
+ 360 0174 5307      		cpc r21,r19
+ 361 0176 00F0      		brlo .L21
+ 118:dimmer.c      **** 			*dimmers[i].port |= dimmers[i].mask;
+ 362               		.loc 1 118 0 is_stmt 1
+ 363 0178 CD91      		ld r28,X+
+ 364 017a DC91      		ld r29,X
+ 365 017c 1197      		sbiw r26,1
+ 366 017e 2881      		ld r18,Y
+ 367 0180 3081      		ld r19,Z
+ 368 0182 232B      		or r18,r19
+ 369 0184 2883      		st Y,r18
+ 370               	.LVL14:
+ 371               	.LBB7:
+ 372               	.LBB8:
+ 373               		.file 2 "/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h"
+   1:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** /* Copyright (c) 2002, Marek Michalkiewicz
+   2:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    Copyright (c) 2004,2005,2007 Joerg Wunsch
+   3:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    Copyright (c) 2007  Florin-Viorel Petrov
+   4:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    All rights reserved.
+   5:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+   6:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    Redistribution and use in source and binary forms, with or without
+   7:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    modification, are permitted provided that the following conditions are met:
+   8:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+   9:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    * Redistributions of source code must retain the above copyright
+  10:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****      notice, this list of conditions and the following disclaimer.
+  11:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+  12:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    * Redistributions in binary form must reproduce the above copyright
+  13:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****      notice, this list of conditions and the following disclaimer in
+  14:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****      the documentation and/or other materials provided with the
+  15:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****      distribution.
+  16:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+  17:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    * Neither the name of the copyright holders nor the names of
+  18:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****      contributors may be used to endorse or promote products derived
+  19:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****      from this software without specific prior written permission.
+  20:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+  21:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+  22:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****   AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  23:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+  24:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****   ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+  25:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****   LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+  26:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****   CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  27:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****   SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  28:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****   INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  29:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****   CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  30:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+  31:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****   POSSIBILITY OF SUCH DAMAGE. */
+  32:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+  33:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** /* $Id: delay.h.in 2251 2011-09-14 08:20:33Z joerg_wunsch $ */
+  34:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+  35:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** #ifndef _UTIL_DELAY_H_
+  36:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** #define _UTIL_DELAY_H_ 1
+  37:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+  38:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** #ifndef __HAS_DELAY_CYCLES
+  39:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** #define __HAS_DELAY_CYCLES 1
+  40:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** #endif
+  41:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+  42:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** #include <inttypes.h>
+  43:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** #include <util/delay_basic.h>
+  44:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** #include <math.h>
+  45:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+  46:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** /** \file */
+  47:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** /** \defgroup util_delay <util/delay.h>: Convenience functions for busy-wait delay loops
+  48:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     \code
+  49:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     #define F_CPU 1000000UL  // 1 MHz
+  50:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     //#define F_CPU 14.7456E6
+  51:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     #include <util/delay.h>
+  52:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     \endcode
+  53:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+  54:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     \note As an alternative method, it is possible to pass the
+  55:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     F_CPU macro down to the compiler from the Makefile.
+  56:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     Obviously, in that case, no \c \#define statement should be
+  57:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     used.
+  58:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+  59:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     The functions in this header file are wrappers around the basic
+  60:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     busy-wait functions from <util/delay_basic.h>.  They are meant as
+  61:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     convenience functions where actual time values can be specified
+  62:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     rather than a number of cycles to wait for.  The idea behind is
+  63:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     that compile-time constant expressions will be eliminated by
+  64:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     compiler optimization so floating-point expressions can be used
+  65:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     to calculate the number of delay cycles needed based on the CPU
+  66:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     frequency passed by the macro F_CPU.
+  67:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+  68:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     \note In order for these functions to work as intended, compiler
+  69:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     optimizations <em>must</em> be enabled, and the delay time
+  70:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     <em>must</em> be an expression that is a known constant at
+  71:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     compile-time.  If these requirements are not met, the resulting
+  72:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     delay will be much longer (and basically unpredictable), and
+  73:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     applications that otherwise do not use floating-point calculations
+  74:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     will experience severe code bloat by the floating-point library
+  75:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     routines linked into the application.
+  76:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+  77:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     The functions available allow the specification of microsecond, and
+  78:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     millisecond delays directly, using the application-supplied macro
+  79:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     F_CPU as the CPU clock frequency (in Hertz).
+  80:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+  81:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** */
+  82:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+  83:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** #if !defined(__DOXYGEN__)
+  84:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** static inline void _delay_us(double __us) __attribute__((always_inline));
+  85:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** static inline void _delay_ms(double __ms) __attribute__((always_inline));
+  86:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** #endif
+  87:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+  88:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** #ifndef F_CPU
+  89:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** /* prevent compiler error by supplying a default */
+  90:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** # warning "F_CPU not defined for <util/delay.h>"
+  91:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** # define F_CPU 1000000UL
+  92:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** #endif
+  93:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+  94:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** #ifndef __OPTIMIZE__
+  95:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** # warning "Compiler optimizations disabled; functions from <util/delay.h> won't work as designed"
+  96:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** #endif
+  97:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+  98:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** #if __HAS_DELAY_CYCLES && defined(__OPTIMIZE__) && \
+  99:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****   !defined(__DELAY_BACKWARD_COMPATIBLE__) &&	   \
+ 100:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****   __STDC_HOSTED__
+ 101:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** #  include <math.h>
+ 102:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** #endif
+ 103:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+ 104:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** /**
+ 105:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    \ingroup util_delay
+ 106:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+ 107:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    Perform a delay of \c __ms milliseconds, using _delay_loop_2().
+ 108:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+ 109:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    The macro F_CPU is supposed to be defined to a
+ 110:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    constant defining the CPU clock frequency (in Hertz).
+ 111:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+ 112:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    The maximal possible delay is 262.14 ms / F_CPU in MHz.
+ 113:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+ 114:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    When the user request delay which exceed the maximum possible one,
+ 115:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    _delay_ms() provides a decreased resolution functionality. In this
+ 116:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    mode _delay_ms() will work with a resolution of 1/10 ms, providing
+ 117:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    delays up to 6.5535 seconds (independent from CPU frequency).  The
+ 118:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    user will not be informed about decreased resolution.
+ 119:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+ 120:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    If the avr-gcc toolchain has __builtin_avr_delay_cycles(unsigned long)
+ 121:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    support, maximal possible delay is 4294967.295 ms/ F_CPU in MHz. For
+ 122:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    values greater than the maximal possible delay, overflows results in
+ 123:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    no delay i.e., 0ms.
+ 124:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+ 125:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    Conversion of __us into clock cycles may not always result in integer.
+ 126:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    By default, the clock cycles rounded up to next integer. This ensures that
+ 127:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    the user gets atleast __us microseconds of delay.
+ 128:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+ 129:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    Alternatively, user can define __DELAY_ROUND_DOWN__ and __DELAY_ROUND_CLOSEST__
+ 130:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    to round down and round to closest integer.
+ 131:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+ 132:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    Note: The new implementation of _delay_ms(double __ms) with 
+ 133:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     __builtin_avr_delay_cycles(unsigned long) support is not backward compatible. 
+ 134:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    User can define __DELAY_BACKWARD_COMPATIBLE__ to get a backward compatible delay.
+ 135:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    Also, the backward compatible
+ 136:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    algorithm will be chosen if the code is compiled in a <em>freestanding
+ 137:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    environment</em> (GCC option \c -ffreestanding), as the math functions
+ 138:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    required for rounding are not available to the compiler then.
+ 139:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+ 140:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****  */
+ 141:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** void
+ 142:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** _delay_ms(double __ms)
+ 143:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** {
+ 144:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 	uint16_t __ticks;
+ 145:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 	double __tmp ; 
+ 146:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** #if __HAS_DELAY_CYCLES && defined(__OPTIMIZE__) && \
+ 147:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****   !defined(__DELAY_BACKWARD_COMPATIBLE__) &&	   \
+ 148:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****   __STDC_HOSTED__
+ 149:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 	uint32_t __ticks_dc;
+ 150:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 	extern void __builtin_avr_delay_cycles(unsigned long);
+ 151:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 	__tmp = ((F_CPU) / 1e3) * __ms;
+ 152:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+ 153:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 	#if defined(__DELAY_ROUND_DOWN__)
+ 154:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 		__ticks_dc = (uint32_t)fabs(__tmp);
+ 155:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+ 156:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 	#elif defined(__DELAY_ROUND_CLOSEST__)
+ 157:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 		__ticks_dc = (uint32_t)(fabs(__tmp)+0.5);
+ 158:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+ 159:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 	#else
+ 160:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 		//round up by default
+ 161:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 		__ticks_dc = (uint32_t)(ceil(fabs(__tmp)));
+ 162:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 	#endif
+ 163:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+ 164:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 	__builtin_avr_delay_cycles(__ticks_dc);
+ 165:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+ 166:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** #else
+ 167:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 	__tmp = ((F_CPU) / 4e3) * __ms;
+ 168:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 	if (__tmp < 1.0)
+ 169:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 		__ticks = 1;
+ 170:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 	else if (__tmp > 65535)
+ 171:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 	{
+ 172:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 		//	__ticks = requested delay in 1/10 ms
+ 173:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 		__ticks = (uint16_t) (__ms * 10.0);
+ 174:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 		while(__ticks)
+ 175:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 		{
+ 176:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 			// wait 1/10 ms
+ 177:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 			_delay_loop_2(((F_CPU) / 4e3) / 10);
+ 178:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 			__ticks --;
+ 179:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 		}
+ 180:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 		return;
+ 181:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 	}
+ 182:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 	else
+ 183:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 		__ticks = (uint16_t)__tmp;
+ 184:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 	_delay_loop_2(__ticks);
+ 185:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** #endif
+ 186:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** }
+ 187:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+ 188:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** /**
+ 189:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    \ingroup util_delay
+ 190:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+ 191:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    Perform a delay of \c __us microseconds, using _delay_loop_1().
+ 192:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+ 193:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    The macro F_CPU is supposed to be defined to a
+ 194:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    constant defining the CPU clock frequency (in Hertz).
+ 195:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+ 196:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    The maximal possible delay is 768 us / F_CPU in MHz.
+ 197:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+ 198:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    If the user requests a delay greater than the maximal possible one,
+ 199:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    _delay_us() will automatically call _delay_ms() instead.  The user
+ 200:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    will not be informed about this case.
+ 201:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+ 202:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    If the avr-gcc toolchain has __builtin_avr_delay_cycles(unsigned long)
+ 203:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    support, maximal possible delay is 4294967.295 us/ F_CPU in MHz. For
+ 204:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    values greater than the maximal possible delay, overflow results in
+ 205:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    no delay i.e., 0us.
+ 206:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****   
+ 207:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    Conversion of __us into clock cycles may not always result in integer.
+ 208:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    By default, the clock cycles rounded up to next integer. This ensures that
+ 209:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    the user gets atleast __us microseconds of delay.
+ 210:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+ 211:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    Alternatively, user can define __DELAY_ROUND_DOWN__ and __DELAY_ROUND_CLOSEST__
+ 212:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    to round down and round to closest integer.
+ 213:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****  
+ 214:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    Note: The new implementation of _delay_us(double __us) with 
+ 215:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****     __builtin_avr_delay_cycles(unsigned long) support is not backward compatible.
+ 216:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    User can define __DELAY_BACKWARD_COMPATIBLE__ to get a backward compatible delay.
+ 217:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    Also, the backward compatible
+ 218:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    algorithm will be chosen if the code is compiled in a <em>freestanding
+ 219:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    environment</em> (GCC option \c -ffreestanding), as the math functions
+ 220:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    required for rounding are not available to the compiler then.
+ 221:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+ 222:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****  */
+ 223:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** void
+ 224:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** _delay_us(double __us)
+ 225:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** {
+ 226:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 	uint8_t __ticks;
+ 227:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 	double __tmp ; 
+ 228:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** #if __HAS_DELAY_CYCLES && defined(__OPTIMIZE__) && \
+ 229:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****   !defined(__DELAY_BACKWARD_COMPATIBLE__) &&	   \
+ 230:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****   __STDC_HOSTED__
+ 231:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 	uint32_t __ticks_dc;
+ 232:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 	extern void __builtin_avr_delay_cycles(unsigned long);
+ 233:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 	__tmp = ((F_CPU) / 1e6) * __us;
+ 234:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+ 235:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 	#if defined(__DELAY_ROUND_DOWN__)
+ 236:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 		__ticks_dc = (uint32_t)fabs(__tmp);
+ 237:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+ 238:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 	#elif defined(__DELAY_ROUND_CLOSEST__)
+ 239:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 		__ticks_dc = (uint32_t)(fabs(__tmp)+0.5);
+ 240:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+ 241:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 	#else
+ 242:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 		//round up by default
+ 243:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 		__ticks_dc = (uint32_t)(ceil(fabs(__tmp)));
+ 244:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 	#endif
+ 245:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
+ 246:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 	__builtin_avr_delay_cycles(__ticks_dc);
+ 374               		.loc 2 246 0
+ 375 0186 28E2      		ldi r18,lo8(40)
+ 376 0188 2A95      		1: dec r18
+ 377 018a 01F4      		brne 1b
+ 378               	.LBE8:
+ 379               	.LBE7:
+ 119:dimmer.c      **** 			_delay_us(10);
+ 120:dimmer.c      **** 			*dimmers[i].port ^= dimmers[i].mask;
+ 380               		.loc 1 120 0
+ 381 018c CD91      		ld r28,X+
+ 382 018e DC91      		ld r29,X
+ 383 0190 1197      		sbiw r26,1
+ 384 0192 2881      		ld r18,Y
+ 385 0194 3081      		ld r19,Z
+ 386 0196 2327      		eor r18,r19
+ 387 0198 2883      		st Y,r18
+ 388               	.LVL15:
+ 389               	.L21:
+ 390 019a 0196      		adiw r24,1
+ 391 019c 1596      		adiw r26,5
+ 392 019e 3596      		adiw r30,5
+ 116:dimmer.c      **** 	for(uint8_t i = 0; i < DIMMER_COUNT; i++) {
+ 393               		.loc 1 116 0
+ 394 01a0 8230      		cpi r24,2
+ 395 01a2 9105      		cpc r25,__zero_reg__
+ 396 01a4 01F4      		brne .L22
+ 397               	/* epilogue start */
+ 398               	.LBE6:
+ 121:dimmer.c      **** 		}
+ 122:dimmer.c      **** 	}
+ 123:dimmer.c      **** }
+ 399               		.loc 1 123 0
+ 400 01a6 FF91      		pop r31
+ 401 01a8 EF91      		pop r30
+ 402 01aa DF91      		pop r29
+ 403 01ac CF91      		pop r28
+ 404 01ae BF91      		pop r27
+ 405 01b0 AF91      		pop r26
+ 406 01b2 9F91      		pop r25
+ 407 01b4 8F91      		pop r24
+ 408 01b6 6F91      		pop r22
+ 409 01b8 5F91      		pop r21
+ 410 01ba 4F91      		pop r20
+ 411 01bc 3F91      		pop r19
+ 412 01be 2F91      		pop r18
+ 413 01c0 0F90      		pop r0
+ 414 01c2 0FBE      		out __SREG__,r0
+ 415 01c4 0F90      		pop r0
+ 416 01c6 1F90      		pop r1
+ 417 01c8 1895      		reti
+ 418               	.LFE13:
+ 420               	.global	__vector_14
+ 422               	__vector_14:
+ 423               	.LFB14:
+ 124:dimmer.c      **** 
+ 125:dimmer.c      **** //Dimming Interrupt
+ 126:dimmer.c      **** ISR(TIMER0_COMPA_vect) {
+ 424               		.loc 1 126 0
+ 425 01ca 1F92      		push r1
+ 426               	.LCFI21:
+ 427 01cc 0F92      		push r0
+ 428               	.LCFI22:
+ 429 01ce 0FB6      		in r0,__SREG__
+ 430 01d0 0F92      		push r0
+ 431 01d2 1124      		clr __zero_reg__
+ 432 01d4 8F93      		push r24
+ 433               	.LCFI23:
+ 434 01d6 9F93      		push r25
+ 435               	.LCFI24:
+ 436               	/* prologue: Signal */
+ 437               	/* frame size = 0 */
+ 438               	/* stack size = 5 */
+ 439               	.L__stack_usage = 5
+ 440               	.LVL16:
+ 441               	.LBB9:
+ 127:dimmer.c      **** 	for(uint8_t i = 0; i < DIMMER_COUNT; i++) {
+ 128:dimmer.c      **** 		if(dimmers[i].level_req > dimmers[i].level_cur) {
+ 442               		.loc 1 128 0
+ 443 01d8 9091 0000 		lds r25,dimmers+1
+ 444 01dc 8091 0000 		lds r24,dimmers
+ 445 01e0 8917      		cp r24,r25
+ 446 01e2 00F0      		brlo .L28
+ 129:dimmer.c      **** 			dimmers[i].level_cur++;
+ 130:dimmer.c      **** 		} else if(dimmers[i].level_req < dimmers[i].level_cur) {
+ 447               		.loc 1 130 0
+ 448 01e4 9091 0000 		lds r25,dimmers+1
+ 449 01e8 8091 0000 		lds r24,dimmers
+ 450 01ec 9817      		cp r25,r24
+ 451 01ee 00F4      		brsh .L29
+ 131:dimmer.c      **** 			dimmers[i].level_cur--;
+ 452               		.loc 1 131 0
+ 453 01f0 8091 0000 		lds r24,dimmers
+ 454 01f4 8150      		subi r24,lo8(-(-1))
+ 455 01f6 00C0      		rjmp .L32
+ 456               	.L28:
+ 129:dimmer.c      **** 			dimmers[i].level_cur++;
+ 457               		.loc 1 129 0
+ 458 01f8 8091 0000 		lds r24,dimmers
+ 459 01fc 8F5F      		subi r24,lo8(-(1))
+ 460               	.L32:
+ 461 01fe 8093 0000 		sts dimmers,r24
+ 462               	.L29:
+ 463               	.LVL17:
+ 128:dimmer.c      **** 		if(dimmers[i].level_req > dimmers[i].level_cur) {
+ 464               		.loc 1 128 0
+ 465 0202 9091 0000 		lds r25,dimmers+6
+ 466 0206 8091 0000 		lds r24,dimmers+5
+ 467 020a 8917      		cp r24,r25
+ 468 020c 00F4      		brsh .L30
+ 129:dimmer.c      **** 			dimmers[i].level_cur++;
+ 469               		.loc 1 129 0
+ 470 020e 8091 0000 		lds r24,dimmers+5
+ 471 0212 8F5F      		subi r24,lo8(-(1))
+ 472 0214 00C0      		rjmp .L33
+ 473               	.L30:
+ 130:dimmer.c      **** 		} else if(dimmers[i].level_req < dimmers[i].level_cur) {
+ 474               		.loc 1 130 0
+ 475 0216 9091 0000 		lds r25,dimmers+6
+ 476 021a 8091 0000 		lds r24,dimmers+5
+ 477 021e 9817      		cp r25,r24
+ 478 0220 00F4      		brsh .L27
+ 479               		.loc 1 131 0
+ 480 0222 8091 0000 		lds r24,dimmers+5
+ 481 0226 8150      		subi r24,lo8(-(-1))
+ 482               	.L33:
+ 483 0228 8093 0000 		sts dimmers+5,r24
+ 484               	.LVL18:
+ 485               	.L27:
+ 486               	/* epilogue start */
+ 487               	.LBE9:
+ 132:dimmer.c      **** 		}
+ 133:dimmer.c      **** 	
+ 134:dimmer.c      **** 	}
+ 135:dimmer.c      **** }...
+ 488               		.loc 1 135 0
+ 489 022c 9F91      		pop r25
+ 490 022e 8F91      		pop r24
+ 491 0230 0F90      		pop r0
+ 492 0232 0FBE      		out __SREG__,r0
+ 493 0234 0F90      		pop r0
+ 494 0236 1F90      		pop r1
+ 495 0238 1895      		reti
+ 496               	.LFE14:
+ 498               		.comm	count,2,1
+ 499               		.comm	dimmers,10,1
+ 732               	.Letext0:
+ 733               		.file 3 "/usr/lib/gcc/avr/4.7.2/../../../avr/include/stdint.h"
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 dimmer.c
+     /tmp/ccLUPQbd.s:2      *ABS*:000000000000003e __SP_H__
+     /tmp/ccLUPQbd.s:3      *ABS*:000000000000003d __SP_L__
+     /tmp/ccLUPQbd.s:4      *ABS*:000000000000003f __SREG__
+     /tmp/ccLUPQbd.s:5      *ABS*:0000000000000000 __tmp_reg__
+     /tmp/ccLUPQbd.s:6      *ABS*:0000000000000001 __zero_reg__
+     /tmp/ccLUPQbd.s:11     .text:0000000000000000 initIO
+     /tmp/ccLUPQbd.s:68     .text:000000000000003a initDimmers
+                            *COM*:000000000000000a dimmers
+     /tmp/ccLUPQbd.s:102    .text:000000000000006c rampToLevel
+     /tmp/ccLUPQbd.s:146    .text.startup:0000000000000000 main
+     /tmp/ccLUPQbd.s:182    .text:0000000000000094 switchToLevel
+     /tmp/ccLUPQbd.s:227    .text:00000000000000be __vector_1
+                            *COM*:0000000000000002 count
+     /tmp/ccLUPQbd.s:286    .text:000000000000010e __vector_11
+     /tmp/ccLUPQbd.s:422    .text:00000000000001ca __vector_14
+
+UNDEFINED SYMBOLS
+__do_clear_bss

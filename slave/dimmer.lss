@@ -1,0 +1,496 @@
+
+dimmer.elf:     file format elf32-avr
+
+Sections:
+Idx Name          Size      VMA       LMA       File off  Algn
+  0 .text         00000288  00000000  00000000  00000074  2**1
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+  1 .bss          0000000c  00800100  00800100  000002fc  2**0
+                  ALLOC
+  2 .stab         000006cc  00000000  00000000  000002fc  2**2
+                  CONTENTS, READONLY, DEBUGGING
+  3 .stabstr      00000054  00000000  00000000  000009c8  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  4 .comment      00000011  00000000  00000000  00000a1c  2**0
+                  CONTENTS, READONLY
+  5 .debug_aranges 00000028  00000000  00000000  00000a2d  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  6 .debug_info   00000344  00000000  00000000  00000a55  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  7 .debug_abbrev 000001ed  00000000  00000000  00000d99  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  8 .debug_line   00000113  00000000  00000000  00000f86  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  9 .debug_frame  00000134  00000000  00000000  0000109c  2**2
+                  CONTENTS, READONLY, DEBUGGING
+ 10 .debug_str    0000017a  00000000  00000000  000011d0  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 11 .debug_loc    0000025b  00000000  00000000  0000134a  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 12 .debug_ranges 00000018  00000000  00000000  000015a5  2**0
+                  CONTENTS, READONLY, DEBUGGING
+
+Disassembly of section .text:
+
+00000000 <__vectors>:
+   0:	19 c0       	rjmp	.+50     	; 0x34 <__ctors_end>
+   2:	70 c0       	rjmp	.+224    	; 0xe4 <__vector_1>
+   4:	27 c0       	rjmp	.+78     	; 0x54 <__bad_interrupt>
+   6:	26 c0       	rjmp	.+76     	; 0x54 <__bad_interrupt>
+   8:	25 c0       	rjmp	.+74     	; 0x54 <__bad_interrupt>
+   a:	24 c0       	rjmp	.+72     	; 0x54 <__bad_interrupt>
+   c:	23 c0       	rjmp	.+70     	; 0x54 <__bad_interrupt>
+   e:	22 c0       	rjmp	.+68     	; 0x54 <__bad_interrupt>
+  10:	21 c0       	rjmp	.+66     	; 0x54 <__bad_interrupt>
+  12:	20 c0       	rjmp	.+64     	; 0x54 <__bad_interrupt>
+  14:	1f c0       	rjmp	.+62     	; 0x54 <__bad_interrupt>
+  16:	8e c0       	rjmp	.+284    	; 0x134 <__vector_11>
+  18:	1d c0       	rjmp	.+58     	; 0x54 <__bad_interrupt>
+  1a:	1c c0       	rjmp	.+56     	; 0x54 <__bad_interrupt>
+  1c:	e9 c0       	rjmp	.+466    	; 0x1f0 <__vector_14>
+  1e:	1a c0       	rjmp	.+52     	; 0x54 <__bad_interrupt>
+  20:	19 c0       	rjmp	.+50     	; 0x54 <__bad_interrupt>
+  22:	1e c1       	rjmp	.+572    	; 0x260 <__vector_17>
+  24:	17 c0       	rjmp	.+46     	; 0x54 <__bad_interrupt>
+  26:	16 c0       	rjmp	.+44     	; 0x54 <__bad_interrupt>
+  28:	15 c0       	rjmp	.+42     	; 0x54 <__bad_interrupt>
+  2a:	14 c0       	rjmp	.+40     	; 0x54 <__bad_interrupt>
+  2c:	13 c0       	rjmp	.+38     	; 0x54 <__bad_interrupt>
+  2e:	12 c0       	rjmp	.+36     	; 0x54 <__bad_interrupt>
+  30:	11 c0       	rjmp	.+34     	; 0x54 <__bad_interrupt>
+  32:	10 c0       	rjmp	.+32     	; 0x54 <__bad_interrupt>
+
+00000034 <__ctors_end>:
+  34:	11 24       	eor	r1, r1
+  36:	1f be       	out	0x3f, r1	; 63
+  38:	cf ef       	ldi	r28, 0xFF	; 255
+  3a:	d2 e0       	ldi	r29, 0x02	; 2
+  3c:	de bf       	out	0x3e, r29	; 62
+  3e:	cd bf       	out	0x3d, r28	; 61
+
+00000040 <__do_clear_bss>:
+  40:	11 e0       	ldi	r17, 0x01	; 1
+  42:	a0 e0       	ldi	r26, 0x00	; 0
+  44:	b1 e0       	ldi	r27, 0x01	; 1
+  46:	01 c0       	rjmp	.+2      	; 0x4a <.do_clear_bss_start>
+
+00000048 <.do_clear_bss_loop>:
+  48:	1d 92       	st	X+, r1
+
+0000004a <.do_clear_bss_start>:
+  4a:	ac 30       	cpi	r26, 0x0C	; 12
+  4c:	b1 07       	cpc	r27, r17
+  4e:	e1 f7       	brne	.-8      	; 0x48 <.do_clear_bss_loop>
+  50:	16 d1       	rcall	.+556    	; 0x27e <main>
+  52:	18 c1       	rjmp	.+560    	; 0x284 <_exit>
+
+00000054 <__bad_interrupt>:
+  54:	d5 cf       	rjmp	.-86     	; 0x0 <__vectors>
+
+00000056 <initIO>:
+
+
+void initIO (void)
+{
+	//Set up the Data Direction Register
+	DDRC = 0xFF;
+  56:	8f ef       	ldi	r24, 0xFF	; 255
+  58:	87 b9       	out	0x07, r24	; 7
+	//Set the triacs off.
+	PORTC = 0x00;
+  5a:	18 b8       	out	0x08, r1	; 8
+	
+	//INT0 - ZCD
+	EICRA = (1<<ISC01) | (0<<ISC00);
+  5c:	82 e0       	ldi	r24, 0x02	; 2
+  5e:	80 93 69 00 	sts	0x0069, r24
+	EIMSK |= (1<<INT0);
+  62:	e8 9a       	sbi	0x1d, 0	; 29
+
+	//Dimming Timer (TODO: Enable/Disable on Dimming request).
+	TCCR0A = 	(1 << WGM01);
+  64:	84 bd       	out	0x24, r24	; 36
+	TCCR0B = 	((1 << CS02) | (1 << CS00));		// CTC Mode - Prescaler 1024
+  66:	95 e0       	ldi	r25, 0x05	; 5
+  68:	95 bd       	out	0x25, r25	; 37
+	OCR0A = 	156;								// ~10ms
+  6a:	9c e9       	ldi	r25, 0x9C	; 156
+  6c:	97 bd       	out	0x27, r25	; 39
+	TIMSK0 = 	(1 << OCIE0A);
+  6e:	80 93 6e 00 	sts	0x006E, r24
+
+	//Set up SPI
+	DDRB &= ~((1<<2)|(1<<3)|(1<<5));   // SCK, MOSI and SS as inputs
+  72:	84 b1       	in	r24, 0x04	; 4
+  74:	83 7d       	andi	r24, 0xD3	; 211
+  76:	84 b9       	out	0x04, r24	; 4
+    DDRB |= (1<<4);                    // MISO as output
+  78:	24 9a       	sbi	0x04, 4	; 4
+
+    SPCR &= ~(1<<MSTR);                // Set as slave 
+  7a:	8c b5       	in	r24, 0x2c	; 44
+  7c:	8f 7e       	andi	r24, 0xEF	; 239
+  7e:	8c bd       	out	0x2c, r24	; 44
+    SPCR |= (1<<SPR0)|(1<<SPR1);       // divide clock by 128
+  80:	8c b5       	in	r24, 0x2c	; 44
+  82:	83 60       	ori	r24, 0x03	; 3
+  84:	8c bd       	out	0x2c, r24	; 44
+    SPCR |= (1<<SPE);                  // Enable SPI
+  86:	8c b5       	in	r24, 0x2c	; 44
+  88:	80 64       	ori	r24, 0x40	; 64
+  8a:	8c bd       	out	0x2c, r24	; 44
+
+	sei();
+  8c:	78 94       	sei
+  8e:	08 95       	ret
+
+00000090 <initDimmers>:
+}
+
+void initDimmers(void) {
+	dimmers[0].level_cur = 0;
+  90:	10 92 00 01 	sts	0x0100, r1
+	dimmers[0].level_req = 0;
+  94:	10 92 01 01 	sts	0x0101, r1
+	dimmers[0].port = &PORTC;
+  98:	88 e2       	ldi	r24, 0x28	; 40
+  9a:	90 e0       	ldi	r25, 0x00	; 0
+  9c:	90 93 03 01 	sts	0x0103, r25
+  a0:	80 93 02 01 	sts	0x0102, r24
+	dimmers[0].mask = 0x01;
+  a4:	21 e0       	ldi	r18, 0x01	; 1
+  a6:	20 93 04 01 	sts	0x0104, r18
+	
+	dimmers[1].level_cur = 0;
+  aa:	10 92 05 01 	sts	0x0105, r1
+	dimmers[1].level_req = 0;
+  ae:	10 92 06 01 	sts	0x0106, r1
+	dimmers[1].port = &PORTC;
+  b2:	90 93 08 01 	sts	0x0108, r25
+  b6:	80 93 07 01 	sts	0x0107, r24
+	dimmers[1].mask = 0x02;
+  ba:	82 e0       	ldi	r24, 0x02	; 2
+  bc:	80 93 09 01 	sts	0x0109, r24
+  c0:	08 95       	ret
+
+000000c2 <rampToLevel>:
+		level = 255;
+	
+	if(level < 0 ) 
+		level = 0;
+	
+	dimmers[index].level_req = level;
+  c2:	95 e0       	ldi	r25, 0x05	; 5
+  c4:	89 9f       	mul	r24, r25
+  c6:	f0 01       	movw	r30, r0
+  c8:	11 24       	eor	r1, r1
+  ca:	e0 50       	subi	r30, 0x00	; 0
+  cc:	ff 4f       	sbci	r31, 0xFF	; 255
+  ce:	61 83       	std	Z+1, r22	; 0x01
+  d0:	08 95       	ret
+
+000000d2 <switchToLevel>:
+		level = 255;
+	
+	if(level < 0 ) 
+		level = 0;
+
+	dimmers[index].level_req = level;
+  d2:	95 e0       	ldi	r25, 0x05	; 5
+  d4:	89 9f       	mul	r24, r25
+  d6:	f0 01       	movw	r30, r0
+  d8:	11 24       	eor	r1, r1
+  da:	e0 50       	subi	r30, 0x00	; 0
+  dc:	ff 4f       	sbci	r31, 0xFF	; 255
+  de:	61 83       	std	Z+1, r22	; 0x01
+	dimmers[index].level_cur = level;
+  e0:	60 83       	st	Z, r22
+  e2:	08 95       	ret
+
+000000e4 <__vector_1>:
+}
+
+volatile uint16_t count;
+//Zero Cross Detection.
+ISR(INT0_vect) {
+  e4:	1f 92       	push	r1
+  e6:	0f 92       	push	r0
+  e8:	0f b6       	in	r0, 0x3f	; 63
+  ea:	0f 92       	push	r0
+  ec:	11 24       	eor	r1, r1
+  ee:	8f 93       	push	r24
+  f0:	9f 93       	push	r25
+  f2:	ef 93       	push	r30
+  f4:	ff 93       	push	r31
+	count = 256;
+  f6:	80 e0       	ldi	r24, 0x00	; 0
+  f8:	91 e0       	ldi	r25, 0x01	; 1
+  fa:	90 93 0b 01 	sts	0x010B, r25
+  fe:	80 93 0a 01 	sts	0x010A, r24
+
+	TCCR1B |= 	((1 << CS10) | (1 << WGM12));
+ 102:	e1 e8       	ldi	r30, 0x81	; 129
+ 104:	f0 e0       	ldi	r31, 0x00	; 0
+ 106:	80 81       	ld	r24, Z
+ 108:	89 60       	ori	r24, 0x09	; 9
+ 10a:	80 83       	st	Z, r24
+	OCR1A = 	400;
+ 10c:	80 e9       	ldi	r24, 0x90	; 144
+ 10e:	91 e0       	ldi	r25, 0x01	; 1
+ 110:	90 93 89 00 	sts	0x0089, r25
+ 114:	80 93 88 00 	sts	0x0088, r24
+	TIMSK1 |= 	(1 << OCIE1A);	
+ 118:	ef e6       	ldi	r30, 0x6F	; 111
+ 11a:	f0 e0       	ldi	r31, 0x00	; 0
+ 11c:	80 81       	ld	r24, Z
+ 11e:	82 60       	ori	r24, 0x02	; 2
+ 120:	80 83       	st	Z, r24
+}
+ 122:	ff 91       	pop	r31
+ 124:	ef 91       	pop	r30
+ 126:	9f 91       	pop	r25
+ 128:	8f 91       	pop	r24
+ 12a:	0f 90       	pop	r0
+ 12c:	0f be       	out	0x3f, r0	; 63
+ 12e:	0f 90       	pop	r0
+ 130:	1f 90       	pop	r1
+ 132:	18 95       	reti
+
+00000134 <__vector_11>:
+
+//Zero Cross Timer Interrupt.
+ISR(TIMER1_COMPA_vect) {
+ 134:	1f 92       	push	r1
+ 136:	0f 92       	push	r0
+ 138:	0f b6       	in	r0, 0x3f	; 63
+ 13a:	0f 92       	push	r0
+ 13c:	11 24       	eor	r1, r1
+ 13e:	2f 93       	push	r18
+ 140:	3f 93       	push	r19
+ 142:	4f 93       	push	r20
+ 144:	5f 93       	push	r21
+ 146:	6f 93       	push	r22
+ 148:	8f 93       	push	r24
+ 14a:	9f 93       	push	r25
+ 14c:	af 93       	push	r26
+ 14e:	bf 93       	push	r27
+ 150:	cf 93       	push	r28
+ 152:	df 93       	push	r29
+ 154:	ef 93       	push	r30
+ 156:	ff 93       	push	r31
+	count--;
+ 158:	80 91 0a 01 	lds	r24, 0x010A
+ 15c:	90 91 0b 01 	lds	r25, 0x010B
+ 160:	01 97       	sbiw	r24, 0x01	; 1
+ 162:	90 93 0b 01 	sts	0x010B, r25
+ 166:	80 93 0a 01 	sts	0x010A, r24
+ 16a:	a2 e0       	ldi	r26, 0x02	; 2
+ 16c:	b1 e0       	ldi	r27, 0x01	; 1
+ 16e:	e4 e0       	ldi	r30, 0x04	; 4
+ 170:	f1 e0       	ldi	r31, 0x01	; 1
+ 172:	80 e0       	ldi	r24, 0x00	; 0
+ 174:	90 e0       	ldi	r25, 0x00	; 0
+	for(uint8_t i = 0; i < DIMMER_COUNT; i++) {
+		if(dimmers[i].level_cur > 0 && dimmers[i].level_cur >= count) {
+ 176:	65 e0       	ldi	r22, 0x05	; 5
+ 178:	68 9f       	mul	r22, r24
+ 17a:	e0 01       	movw	r28, r0
+ 17c:	69 9f       	mul	r22, r25
+ 17e:	d0 0d       	add	r29, r0
+ 180:	11 24       	eor	r1, r1
+ 182:	c0 50       	subi	r28, 0x00	; 0
+ 184:	df 4f       	sbci	r29, 0xFF	; 255
+ 186:	28 81       	ld	r18, Y
+ 188:	22 23       	and	r18, r18
+ 18a:	d1 f0       	breq	.+52     	; 0x1c0 <__vector_11+0x8c>
+ 18c:	48 81       	ld	r20, Y
+ 18e:	20 91 0a 01 	lds	r18, 0x010A
+ 192:	30 91 0b 01 	lds	r19, 0x010B
+ 196:	50 e0       	ldi	r21, 0x00	; 0
+ 198:	42 17       	cp	r20, r18
+ 19a:	53 07       	cpc	r21, r19
+ 19c:	88 f0       	brcs	.+34     	; 0x1c0 <__vector_11+0x8c>
+			*dimmers[i].port |= dimmers[i].mask;
+ 19e:	cd 91       	ld	r28, X+
+ 1a0:	dc 91       	ld	r29, X
+ 1a2:	11 97       	sbiw	r26, 0x01	; 1
+ 1a4:	28 81       	ld	r18, Y
+ 1a6:	30 81       	ld	r19, Z
+ 1a8:	23 2b       	or	r18, r19
+ 1aa:	28 83       	st	Y, r18
+	#else
+		//round up by default
+		__ticks_dc = (uint32_t)(ceil(fabs(__tmp)));
+	#endif
+
+	__builtin_avr_delay_cycles(__ticks_dc);
+ 1ac:	28 e2       	ldi	r18, 0x28	; 40
+ 1ae:	2a 95       	dec	r18
+ 1b0:	f1 f7       	brne	.-4      	; 0x1ae <__vector_11+0x7a>
+			_delay_us(10);
+			*dimmers[i].port ^= dimmers[i].mask;
+ 1b2:	cd 91       	ld	r28, X+
+ 1b4:	dc 91       	ld	r29, X
+ 1b6:	11 97       	sbiw	r26, 0x01	; 1
+ 1b8:	28 81       	ld	r18, Y
+ 1ba:	30 81       	ld	r19, Z
+ 1bc:	23 27       	eor	r18, r19
+ 1be:	28 83       	st	Y, r18
+ 1c0:	01 96       	adiw	r24, 0x01	; 1
+ 1c2:	15 96       	adiw	r26, 0x05	; 5
+ 1c4:	35 96       	adiw	r30, 0x05	; 5
+}
+
+//Zero Cross Timer Interrupt.
+ISR(TIMER1_COMPA_vect) {
+	count--;
+	for(uint8_t i = 0; i < DIMMER_COUNT; i++) {
+ 1c6:	82 30       	cpi	r24, 0x02	; 2
+ 1c8:	91 05       	cpc	r25, r1
+ 1ca:	b1 f6       	brne	.-84     	; 0x178 <__vector_11+0x44>
+			*dimmers[i].port |= dimmers[i].mask;
+			_delay_us(10);
+			*dimmers[i].port ^= dimmers[i].mask;
+		}
+	}
+}
+ 1cc:	ff 91       	pop	r31
+ 1ce:	ef 91       	pop	r30
+ 1d0:	df 91       	pop	r29
+ 1d2:	cf 91       	pop	r28
+ 1d4:	bf 91       	pop	r27
+ 1d6:	af 91       	pop	r26
+ 1d8:	9f 91       	pop	r25
+ 1da:	8f 91       	pop	r24
+ 1dc:	6f 91       	pop	r22
+ 1de:	5f 91       	pop	r21
+ 1e0:	4f 91       	pop	r20
+ 1e2:	3f 91       	pop	r19
+ 1e4:	2f 91       	pop	r18
+ 1e6:	0f 90       	pop	r0
+ 1e8:	0f be       	out	0x3f, r0	; 63
+ 1ea:	0f 90       	pop	r0
+ 1ec:	1f 90       	pop	r1
+ 1ee:	18 95       	reti
+
+000001f0 <__vector_14>:
+
+//Dimming Interrupt
+ISR(TIMER0_COMPA_vect) {
+ 1f0:	1f 92       	push	r1
+ 1f2:	0f 92       	push	r0
+ 1f4:	0f b6       	in	r0, 0x3f	; 63
+ 1f6:	0f 92       	push	r0
+ 1f8:	11 24       	eor	r1, r1
+ 1fa:	8f 93       	push	r24
+ 1fc:	9f 93       	push	r25
+	for(uint8_t i = 0; i < DIMMER_COUNT; i++) {
+		if(dimmers[i].level_req > dimmers[i].level_cur) {
+ 1fe:	90 91 01 01 	lds	r25, 0x0101
+ 202:	80 91 00 01 	lds	r24, 0x0100
+ 206:	89 17       	cp	r24, r25
+ 208:	50 f0       	brcs	.+20     	; 0x21e <__vector_14+0x2e>
+			dimmers[i].level_cur++;
+		} else if(dimmers[i].level_req < dimmers[i].level_cur) {
+ 20a:	90 91 01 01 	lds	r25, 0x0101
+ 20e:	80 91 00 01 	lds	r24, 0x0100
+ 212:	98 17       	cp	r25, r24
+ 214:	48 f4       	brcc	.+18     	; 0x228 <__vector_14+0x38>
+			dimmers[i].level_cur--;
+ 216:	80 91 00 01 	lds	r24, 0x0100
+ 21a:	81 50       	subi	r24, 0x01	; 1
+ 21c:	03 c0       	rjmp	.+6      	; 0x224 <__vector_14+0x34>
+
+//Dimming Interrupt
+ISR(TIMER0_COMPA_vect) {
+	for(uint8_t i = 0; i < DIMMER_COUNT; i++) {
+		if(dimmers[i].level_req > dimmers[i].level_cur) {
+			dimmers[i].level_cur++;
+ 21e:	80 91 00 01 	lds	r24, 0x0100
+ 222:	8f 5f       	subi	r24, 0xFF	; 255
+ 224:	80 93 00 01 	sts	0x0100, r24
+}
+
+//Dimming Interrupt
+ISR(TIMER0_COMPA_vect) {
+	for(uint8_t i = 0; i < DIMMER_COUNT; i++) {
+		if(dimmers[i].level_req > dimmers[i].level_cur) {
+ 228:	90 91 06 01 	lds	r25, 0x0106
+ 22c:	80 91 05 01 	lds	r24, 0x0105
+ 230:	89 17       	cp	r24, r25
+ 232:	20 f4       	brcc	.+8      	; 0x23c <__vector_14+0x4c>
+			dimmers[i].level_cur++;
+ 234:	80 91 05 01 	lds	r24, 0x0105
+ 238:	8f 5f       	subi	r24, 0xFF	; 255
+ 23a:	09 c0       	rjmp	.+18     	; 0x24e <__vector_14+0x5e>
+		} else if(dimmers[i].level_req < dimmers[i].level_cur) {
+ 23c:	90 91 06 01 	lds	r25, 0x0106
+ 240:	80 91 05 01 	lds	r24, 0x0105
+ 244:	98 17       	cp	r25, r24
+ 246:	28 f4       	brcc	.+10     	; 0x252 <__vector_14+0x62>
+			dimmers[i].level_cur--;
+ 248:	80 91 05 01 	lds	r24, 0x0105
+ 24c:	81 50       	subi	r24, 0x01	; 1
+ 24e:	80 93 05 01 	sts	0x0105, r24
+		}
+	
+	}
+}
+ 252:	9f 91       	pop	r25
+ 254:	8f 91       	pop	r24
+ 256:	0f 90       	pop	r0
+ 258:	0f be       	out	0x3f, r0	; 63
+ 25a:	0f 90       	pop	r0
+ 25c:	1f 90       	pop	r1
+ 25e:	18 95       	reti
+
+00000260 <__vector_17>:
+
+//SPI data interrupt
+ISR (SPI_STC_vect)
+{
+ 260:	1f 92       	push	r1
+ 262:	0f 92       	push	r0
+ 264:	0f b6       	in	r0, 0x3f	; 63
+ 266:	0f 92       	push	r0
+ 268:	11 24       	eor	r1, r1
+ 26a:	8f 93       	push	r24
+	char data;
+    data = SPDR;
+ 26c:	8e b5       	in	r24, 0x2e	; 46
+		level = 255;
+	
+	if(level < 0 ) 
+		level = 0;
+	
+	dimmers[index].level_req = level;
+ 26e:	80 93 01 01 	sts	0x0101, r24
+    // do something with the received data
+
+    //Let's just ramp dimmer 0 to the value...
+    rampToLevel(0, data);
+
+ 272:	8f 91       	pop	r24
+ 274:	0f 90       	pop	r0
+ 276:	0f be       	out	0x3f, r0	; 63
+ 278:	0f 90       	pop	r0
+ 27a:	1f 90       	pop	r1
+ 27c:	18 95       	reti
+
+0000027e <main>:
+	dimmers[1].mask = 0x02;
+}
+
+int main (void)
+{
+	initIO(); //Setup IO pins and defaults
+ 27e:	eb de       	rcall	.-554    	; 0x56 <initIO>
+	initDimmers(); //Set up the dimmers.
+ 280:	07 df       	rcall	.-498    	; 0x90 <initDimmers>
+ 282:	ff cf       	rjmp	.-2      	; 0x282 <main+0x4>
+
+00000284 <_exit>:
+ 284:	f8 94       	cli
+
+00000286 <__stop_program>:
+ 286:	ff cf       	rjmp	.-2      	; 0x286 <__stop_program>
