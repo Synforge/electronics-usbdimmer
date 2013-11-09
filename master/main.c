@@ -8,8 +8,6 @@
  * This Revision: $Id$
  */
 
-#define F_CPU 12000000UL 
-
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/pgmspace.h>
@@ -20,23 +18,23 @@
 #include "oddebug.h"
 #include <util/delay.h>
 
-/*
-This module implements an 8 bit parallel output controlled via USB. It is
-intended to switch the power supply to computers and/or other electronic
-devices.
+#define DEBUG_DDR       DDRC
+#define DEBUG_PORT      PORTC
+#define DEBUG_LED       PC0
 
-Application examples:
-- Rebooting computers located at the provider's site
-- Remotely switch on/off of rarely used computers
-- Rebooting other electronic equipment which is left unattended
-- Control room heating from remote
-*/
+#define USB_CMD_SPI     1
+
+#define CMD_STATUS      0x00 //Obtain the status of the dimmer channels
+#define CMD_SET         0x01 //Set a dimmer channel
+
+#define METHOD_SWITCH   0x00
+#define METHOD_RAMP     0x01
 
 #define EEPROM_LOCATION (void *)37
 
 volatile int data = 0;
 
-char spi_putbyte(char spi_data) 
+char spi_putbyte(uchar spi_data) 
 { 
     SPDR = spi_data; 
     while (!(SPSR & (1<<SPIF)));  
@@ -45,16 +43,26 @@ char spi_putbyte(char spi_data)
 
 USB_PUBLIC uchar usbFunctionSetup(uchar data[8])
 {
-usbRequest_t    *rq = (void *)data;
-uchar           status = eeprom_read_byte(EEPROM_LOCATION);
-static uchar    replyBuf[2];
 
-    usbMsgPtr = replyBuf;
-    if(rq->bRequest == 4) {
-        int level = rq->wIndex.bytes[0];
-        spi_putbyte(level);
+    usbRequest_t    *rq = (void *)data;
+//    uchar           status = eeprom_read_byte(EEPROM_LOCATION);
+//    static uchar    replyBuf[2];
+
+//    usbMsgPtr = replyBuf;
+    if(rq->bRequest == USB_CMD_SPI) {
+        return USB_NO_MSG;
     }
     return 0;
+}
+
+USB_PUBLIC uchar usbFunctionWrite(uchar *data, uchar len) {
+    uchar i;
+
+    for(i = 0; i < len; i++) {
+        spi_putbyte(data[i]);
+    }
+                
+    return 1;
 }
 
 void initIO (void)
@@ -62,10 +70,8 @@ void initIO (void)
     DDRB = ~USBMASK;
     PORTD = 0; /* No pullups on USB pins */
 
-    //Set PORT C as all outputs.
-    DDRC = 0xFF;
-
-    PORTC = 0xFF;
+    //Set PORT C debug LED output.
+    DEBUG_DDR = (1<<DEBUG_LED);
 
     //Set up SPI
     DDRB |= (1<<2)|(1<<3)|(1<<5);    // SCK, MOSI and SS as outputs

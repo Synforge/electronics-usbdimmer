@@ -1,4 +1,5 @@
-dimmer.o: dimmer.c /usr/lib/gcc/avr/4.7.2/../../../avr/include/avr/io.h \
+dimmer.o: dimmer.c dimmer.h \
+ /usr/lib/gcc/avr/4.7.2/../../../avr/include/avr/io.h \
  /usr/lib/gcc/avr/4.7.2/../../../avr/include/avr/sfr_defs.h \
  /usr/lib/gcc/avr/4.7.2/../../../avr/include/inttypes.h \
  /usr/lib/gcc/avr/4.7.2/include/stdint.h \
@@ -18,6 +19,8 @@ dimmer.o: dimmer.c /usr/lib/gcc/avr/4.7.2/../../../avr/include/avr/io.h \
  /usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h \
  /usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay_basic.h \
  /usr/lib/gcc/avr/4.7.2/../../../avr/include/math.h
+
+dimmer.h:
 
 /usr/lib/gcc/avr/4.7.2/../../../avr/include/avr/io.h:
 

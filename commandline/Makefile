@@ -1,17 +1,3 @@
-# Name: Makefile
-# Project: PowerSwitch
-# Author: Christian Starkjohann
-# Creation Date: 2005-01-16
-# Tabsize: 4
-# Copyright: (c) 2005 by OBJECTIVE DEVELOPMENT Software GmbH
-# License: GNU GPL v2 (see License.txt) or proprietary (CommercialLicense.txt)
-# This Revision: $Id$
-
-
-# Concigure the following definitions according to your system. The powerSwitch
-# tool has been successfully compiled on Mac OS X, Linux and Windows.
-
-# Use the following 3 lines on Unix (uncomment the framework on Mac OS X):
 USBFLAGS = `libusb-config --cflags`
 USBLIBS = `libusb-config --libs` #-framework CoreFoundation
 EXE_SUFFIX =
@@ -27,7 +13,7 @@ CC		= gcc
 CFLAGS	= $(USBFLAGS) -O -Wall
 LIBS	= $(USBLIBS)
 
-PROGRAM = powerSwitch$(EXE_SUFFIX)
+PROGRAM = usbdim$(EXE_SUFFIX)
 
 
 all: $(PROGRAM)
@@ -35,8 +21,8 @@ all: $(PROGRAM)
 .c.o:
 	$(CC) $(CFLAGS) -c $<
 
-$(PROGRAM): powerSwitch.o
-	$(CC) -o $(PROGRAM) powerSwitch.o $(LIBS)
+$(PROGRAM): usbdim.o
+	$(CC) -o $(PROGRAM) usbdim.o $(LIBS)
 
 strip: $(PROGRAM)
 	strip $(PROGRAM)

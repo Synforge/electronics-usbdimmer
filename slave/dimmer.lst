@@ -10,481 +10,553 @@
   11               	initIO:
   12               	.LFB7:
   13               		.file 1 "dimmer.c"
-   1:dimmer.c      **** #include <avr/io.h>
-   2:dimmer.c      **** #include <avr/interrupt.h>
-   3:dimmer.c      **** #include <avr/pgmspace.h>
-   4:dimmer.c      **** #include <avr/eeprom.h>
-   5:dimmer.c      **** #include <avr/wdt.h>
-   6:dimmer.c      **** 
-   7:dimmer.c      **** #include <util/delay.h>
+   1:dimmer.c      **** #include <dimmer.h>
+   2:dimmer.c      **** 
+   3:dimmer.c      **** #include <avr/io.h>
+   4:dimmer.c      **** #include <avr/interrupt.h>
+   5:dimmer.c      **** #include <avr/pgmspace.h>
+   6:dimmer.c      **** #include <avr/eeprom.h>
+   7:dimmer.c      **** #include <avr/wdt.h>
    8:dimmer.c      **** 
-   9:dimmer.c      **** #define DIMMER_COUNT 2
-  10:dimmer.c      **** #define TRUE 1
-  11:dimmer.c      **** #define FALSE 0
-  12:dimmer.c      **** 
-  13:dimmer.c      **** #define MAX_SIZE 2048
+   9:dimmer.c      **** #include <util/delay.h>
+  10:dimmer.c      **** 
+  11:dimmer.c      **** #define DIMMER_COUNT 2
+  12:dimmer.c      **** #define TRUE 1
+  13:dimmer.c      **** #define FALSE 0
   14:dimmer.c      **** 
-  15:dimmer.c      **** struct dimmer {
-  16:dimmer.c      **** 	volatile uint8_t level_cur;
-  17:dimmer.c      **** 	volatile uint8_t level_req;
-  18:dimmer.c      **** 	volatile uint8_t *port;
-  19:dimmer.c      **** 	uint8_t mask;	
-  20:dimmer.c      **** } dimmers[DIMMER_COUNT];
-  21:dimmer.c      **** 
-  22:dimmer.c      **** void initIO (void)
-  23:dimmer.c      **** {
-  14               		.loc 1 23 0
+  15:dimmer.c      **** #define MAX_SIZE 2048
+  16:dimmer.c      **** 
+  17:dimmer.c      **** #define DEBUG_DDR DDRC
+  18:dimmer.c      **** #define DEBUG_PORT PORTC
+  19:dimmer.c      **** #define DEBUG_LED PC5
+  20:dimmer.c      **** 
+  21:dimmer.c      **** static const char CMD_SET = 0x01; // Set command e.g. [0x01 (command), 0x00(method), 0x01(index) 0x
+  22:dimmer.c      **** 
+  23:dimmer.c      **** static const char METHOD_SWITCH = 0x00;
+  24:dimmer.c      **** static const char METHOD_RAMP = 0x01;
+  25:dimmer.c      **** 
+  26:dimmer.c      **** struct dimmer {
+  27:dimmer.c      **** 	volatile uint8_t level_cur;
+  28:dimmer.c      **** 	volatile uint8_t level_req;
+  29:dimmer.c      **** 	volatile uint8_t *port;
+  30:dimmer.c      **** 	uint8_t mask;	
+  31:dimmer.c      **** } dimmers[DIMMER_COUNT];
+  32:dimmer.c      **** 
+  33:dimmer.c      **** void initIO (void)
+  34:dimmer.c      **** {
+  14               		.loc 1 34 0
   15               	/* prologue: function */
   16               	/* frame size = 0 */
   17               	/* stack size = 0 */
   18               	.L__stack_usage = 0
-  24:dimmer.c      **** 	//Set up the Data Direction Register
-  25:dimmer.c      **** 	DDRC = 0xFF;
-  19               		.loc 1 25 0
-  20 0000 8FEF      		ldi r24,lo8(-1)
+  35:dimmer.c      **** 	//Set the debug LED as output
+  36:dimmer.c      **** 	DEBUG_DDR = (1<<DEBUG_LED);
+  19               		.loc 1 36 0
+  20 0000 80E2      		ldi r24,lo8(32)
   21 0002 87B9      		out 0x7,r24
-  26:dimmer.c      **** 	//Set the triacs off.
-  27:dimmer.c      **** 	PORTC = 0x00;
-  22               		.loc 1 27 0
-  23 0004 18B8      		out 0x8,__zero_reg__
-  28:dimmer.c      **** 	
-  29:dimmer.c      **** 	//INT0 - ZCD
-  30:dimmer.c      **** 	EICRA = (1<<ISC01) | (0<<ISC00);
-  24               		.loc 1 30 0
-  25 0006 82E0      		ldi r24,lo8(2)
-  26 0008 8093 6900 		sts 105,r24
-  31:dimmer.c      **** 	EIMSK |= (1<<INT0);
-  27               		.loc 1 31 0
-  28 000c E89A      		sbi 0x1d,0
-  32:dimmer.c      **** 
-  33:dimmer.c      **** 	//Dimming Timer (TODO: Enable/Disable on Dimming request).
-  34:dimmer.c      **** 	TCCR0A = 	(1 << WGM01);
-  29               		.loc 1 34 0
-  30 000e 84BD      		out 0x24,r24
-  35:dimmer.c      **** 	TCCR0B = 	((1 << CS02) | (1 << CS00));		// CTC Mode - Prescaler 1024
-  31               		.loc 1 35 0
-  32 0010 95E0      		ldi r25,lo8(5)
-  33 0012 95BD      		out 0x25,r25
-  36:dimmer.c      **** 	OCR0A = 	156;								// ~10ms
-  34               		.loc 1 36 0
-  35 0014 9CE9      		ldi r25,lo8(-100)
-  36 0016 97BD      		out 0x27,r25
-  37:dimmer.c      **** 	TIMSK0 = 	(1 << OCIE0A);
-  37               		.loc 1 37 0
-  38 0018 8093 6E00 		sts 110,r24
-  38:dimmer.c      **** 
-  39:dimmer.c      **** 	//Set up SPI
-  40:dimmer.c      **** 	DDRB &= ~((1<<2)|(1<<3)|(1<<5));   // SCK, MOSI and SS as inputs
-  39               		.loc 1 40 0
-  40 001c 84B1      		in r24,0x4
-  41 001e 837D      		andi r24,lo8(-45)
-  42 0020 84B9      		out 0x4,r24
-  41:dimmer.c      ****     DDRB |= (1<<4);                    // MISO as output
-  43               		.loc 1 41 0
-  44 0022 249A      		sbi 0x4,4
-  42:dimmer.c      **** 
-  43:dimmer.c      ****     SPCR &= ~(1<<MSTR);                // Set as slave 
-  45               		.loc 1 43 0
-  46 0024 8CB5      		in r24,0x2c
-  47 0026 8F7E      		andi r24,lo8(-17)
-  48 0028 8CBD      		out 0x2c,r24
-  44:dimmer.c      ****     SPCR |= (1<<SPR0)|(1<<SPR1);       // divide clock by 128
-  49               		.loc 1 44 0
-  50 002a 8CB5      		in r24,0x2c
-  51 002c 8360      		ori r24,lo8(3)
-  52 002e 8CBD      		out 0x2c,r24
-  45:dimmer.c      ****     SPCR |= (1<<SPE);                  // Enable SPI
-  53               		.loc 1 45 0
-  54 0030 8CB5      		in r24,0x2c
-  55 0032 8064      		ori r24,lo8(64)
-  56 0034 8CBD      		out 0x2c,r24
-  46:dimmer.c      **** 
-  47:dimmer.c      **** 	sei();
-  57               		.loc 1 47 0
-  58               	/* #APP */
-  59               	 ;  47 "dimmer.c" 1
-  60 0036 7894      		sei
-  61               	 ;  0 "" 2
-  62               	/* #NOAPP */
-  63 0038 0895      		ret
-  64               	.LFE7:
-  66               	.global	initDimmers
-  68               	initDimmers:
-  69               	.LFB8:
-  48:dimmer.c      **** }
-  49:dimmer.c      **** 
-  50:dimmer.c      **** void initDimmers(void) {
-  70               		.loc 1 50 0
-  71               	/* prologue: function */
-  72               	/* frame size = 0 */
-  73               	/* stack size = 0 */
-  74               	.L__stack_usage = 0
-  51:dimmer.c      **** 	dimmers[0].level_cur = 0;
-  75               		.loc 1 51 0
-  76 003a 1092 0000 		sts dimmers,__zero_reg__
-  52:dimmer.c      **** 	dimmers[0].level_req = 0;
-  77               		.loc 1 52 0
-  78 003e 1092 0000 		sts dimmers+1,__zero_reg__
-  53:dimmer.c      **** 	dimmers[0].port = &PORTC;
-  79               		.loc 1 53 0
-  80 0042 88E2      		ldi r24,lo8(40)
-  81 0044 90E0      		ldi r25,0
-  82 0046 9093 0000 		sts dimmers+2+1,r25
-  83 004a 8093 0000 		sts dimmers+2,r24
-  54:dimmer.c      **** 	dimmers[0].mask = 0x01;
-  84               		.loc 1 54 0
-  85 004e 21E0      		ldi r18,lo8(1)
-  86 0050 2093 0000 		sts dimmers+4,r18
-  55:dimmer.c      **** 	
-  56:dimmer.c      **** 	dimmers[1].level_cur = 0;
-  87               		.loc 1 56 0
-  88 0054 1092 0000 		sts dimmers+5,__zero_reg__
-  57:dimmer.c      **** 	dimmers[1].level_req = 0;
-  89               		.loc 1 57 0
-  90 0058 1092 0000 		sts dimmers+6,__zero_reg__
-  58:dimmer.c      **** 	dimmers[1].port = &PORTC;
-  91               		.loc 1 58 0
-  92 005c 9093 0000 		sts dimmers+7+1,r25
-  93 0060 8093 0000 		sts dimmers+7,r24
-  59:dimmer.c      **** 	dimmers[1].mask = 0x02;
-  94               		.loc 1 59 0
-  95 0064 82E0      		ldi r24,lo8(2)
-  96 0066 8093 0000 		sts dimmers+9,r24
-  97 006a 0895      		ret
-  98               	.LFE8:
- 100               	.global	rampToLevel
- 102               	rampToLevel:
- 103               	.LFB10:
-  60:dimmer.c      **** }
-  61:dimmer.c      **** 
-  62:dimmer.c      **** int main (void)
-  63:dimmer.c      **** {
-  64:dimmer.c      **** 	initIO(); //Setup IO pins and defaults
-  65:dimmer.c      **** 	initDimmers(); //Set up the dimmers.
-  66:dimmer.c      **** 
-  67:dimmer.c      **** 	char data;
-  68:dimmer.c      **** 
-  69:dimmer.c      **** 	while(1) {
-  70:dimmer.c      **** 		while(!(SPSR & (1<<SPIF)));    // wait until all data is received
-  71:dimmer.c      ****         data = SPDR;                   // hurray, we now have our data
-  72:dimmer.c      **** 
-  73:dimmer.c      ****         int level = (int)data;
-  74:dimmer.c      **** 
-  75:dimmer.c      ****         rampToLevel(0, data);
-  76:dimmer.c      **** 	}
-  77:dimmer.c      **** 
-  78:dimmer.c      **** 	return(0);
-  79:dimmer.c      **** }
+  37:dimmer.c      **** 
+  38:dimmer.c      **** 	//INT0 - ZCD
+  39:dimmer.c      **** 	EICRA = (1<<ISC01) | (0<<ISC00);
+  22               		.loc 1 39 0
+  23 0004 82E0      		ldi r24,lo8(2)
+  24 0006 8093 6900 		sts 105,r24
+  40:dimmer.c      **** 	EIMSK |= (1<<INT0);
+  25               		.loc 1 40 0
+  26 000a E89A      		sbi 0x1d,0
+  41:dimmer.c      **** 
+  42:dimmer.c      **** 	//Dimming Timer (TODO: Enable/Disable on Dimming request).
+  43:dimmer.c      **** 	TCCR0A = 	(1 << WGM01);
+  27               		.loc 1 43 0
+  28 000c 84BD      		out 0x24,r24
+  44:dimmer.c      **** 	TCCR0B = 	((1 << CS02) | (1 << CS00));		// CTC Mode - Prescaler 1024
+  29               		.loc 1 44 0
+  30 000e 95E0      		ldi r25,lo8(5)
+  31 0010 95BD      		out 0x25,r25
+  45:dimmer.c      **** 	OCR0A = 	156;								// ~10ms
+  32               		.loc 1 45 0
+  33 0012 9CE9      		ldi r25,lo8(-100)
+  34 0014 97BD      		out 0x27,r25
+  46:dimmer.c      **** 	TIMSK0 = 	(1 << OCIE0A);
+  35               		.loc 1 46 0
+  36 0016 8093 6E00 		sts 110,r24
+  47:dimmer.c      **** 
+  48:dimmer.c      **** 	//Set up SPI
+  49:dimmer.c      **** 	DDRB &= ~((1<<2)|(1<<3)|(1<<5));   // SCK, MOSI and SS as inputs
+  37               		.loc 1 49 0
+  38 001a 84B1      		in r24,0x4
+  39 001c 837D      		andi r24,lo8(-45)
+  40 001e 84B9      		out 0x4,r24
+  50:dimmer.c      ****     DDRB |= (1<<4);                    // MISO as output
+  41               		.loc 1 50 0
+  42 0020 249A      		sbi 0x4,4
+  51:dimmer.c      **** 
+  52:dimmer.c      ****     SPCR &= ~(1<<MSTR);                // Set as slave 
+  43               		.loc 1 52 0
+  44 0022 8CB5      		in r24,0x2c
+  45 0024 8F7E      		andi r24,lo8(-17)
+  46 0026 8CBD      		out 0x2c,r24
+  53:dimmer.c      ****     SPCR |= (1<<SPR0)|(1<<SPR1);       // divide clock by 128
+  47               		.loc 1 53 0
+  48 0028 8CB5      		in r24,0x2c
+  49 002a 8360      		ori r24,lo8(3)
+  50 002c 8CBD      		out 0x2c,r24
+  54:dimmer.c      ****     SPCR |= (1<<SPE);                  // Enable SPI
+  51               		.loc 1 54 0
+  52 002e 8CB5      		in r24,0x2c
+  53 0030 8064      		ori r24,lo8(64)
+  54 0032 8CBD      		out 0x2c,r24
+  55:dimmer.c      **** 
+  56:dimmer.c      **** 	sei();
+  55               		.loc 1 56 0
+  56               	/* #APP */
+  57               	 ;  56 "dimmer.c" 1
+  58 0034 7894      		sei
+  59               	 ;  0 "" 2
+  60               	/* #NOAPP */
+  61 0036 0895      		ret
+  62               	.LFE7:
+  64               	.global	initDimmers
+  66               	initDimmers:
+  67               	.LFB8:
+  57:dimmer.c      **** }
+  58:dimmer.c      **** 
+  59:dimmer.c      **** void initDimmers(void) {
+  68               		.loc 1 59 0
+  69               	/* prologue: function */
+  70               	/* frame size = 0 */
+  71               	/* stack size = 0 */
+  72               	.L__stack_usage = 0
+  60:dimmer.c      **** 	//Set up the Data Direction Register
+  61:dimmer.c      **** 	DDRD = (1<<PD0) | (1<<PD1);
+  73               		.loc 1 61 0
+  74 0038 83E0      		ldi r24,lo8(3)
+  75 003a 8AB9      		out 0xa,r24
+  62:dimmer.c      **** 	//Set the triacs off.
+  63:dimmer.c      **** 	PORTD = 0x00;
+  76               		.loc 1 63 0
+  77 003c 8BE2      		ldi r24,lo8(43)
+  78 003e 90E0      		ldi r25,0
+  79 0040 1BB8      		out 0xb,__zero_reg__
+  64:dimmer.c      **** 
+  65:dimmer.c      **** 	dimmers[0].level_cur = 0;
+  80               		.loc 1 65 0
+  81 0042 1092 0000 		sts dimmers,__zero_reg__
+  66:dimmer.c      **** 	dimmers[0].level_req = 0;
+  82               		.loc 1 66 0
+  83 0046 1092 0000 		sts dimmers+1,__zero_reg__
+  67:dimmer.c      **** 	dimmers[0].port = &PORTD;
+  84               		.loc 1 67 0
+  85 004a 9093 0000 		sts dimmers+2+1,r25
+  86 004e 8093 0000 		sts dimmers+2,r24
+  68:dimmer.c      **** 	dimmers[0].mask = (1<<PD0);
+  87               		.loc 1 68 0
+  88 0052 21E0      		ldi r18,lo8(1)
+  89 0054 2093 0000 		sts dimmers+4,r18
+  69:dimmer.c      **** 	
+  70:dimmer.c      **** 	dimmers[1].level_cur = 0;
+  90               		.loc 1 70 0
+  91 0058 1092 0000 		sts dimmers+5,__zero_reg__
+  71:dimmer.c      **** 	dimmers[1].level_req = 0;
+  92               		.loc 1 71 0
+  93 005c 1092 0000 		sts dimmers+6,__zero_reg__
+  72:dimmer.c      **** 	dimmers[1].port = &PORTD;
+  94               		.loc 1 72 0
+  95 0060 9093 0000 		sts dimmers+7+1,r25
+  96 0064 8093 0000 		sts dimmers+7,r24
+  73:dimmer.c      **** 	dimmers[1].mask = (1<<PD1);
+  97               		.loc 1 73 0
+  98 0068 82E0      		ldi r24,lo8(2)
+  99 006a 8093 0000 		sts dimmers+9,r24
+ 100 006e 0895      		ret
+ 101               	.LFE8:
+ 103               		.section	.text.startup,"ax",@progbits
+ 104               	.global	main
+ 106               	main:
+ 107               	.LFB9:
+  74:dimmer.c      **** }
+  75:dimmer.c      **** 
+  76:dimmer.c      **** int main (void)
+  77:dimmer.c      **** {
+ 108               		.loc 1 77 0
+ 109 0000 CF93      		push r28
+ 110               	.LCFI0:
+ 111 0002 DF93      		push r29
+ 112               	.LCFI1:
+ 113 0004 00D0      		rcall .
+ 114 0006 00D0      		rcall .
+ 115               	.LCFI2:
+ 116 0008 CDB7      		in r28,__SP_L__
+ 117 000a DEB7      		in r29,__SP_H__
+ 118               	.LCFI3:
+ 119               	/* prologue: function */
+ 120               	/* frame size = 4 */
+ 121               	/* stack size = 6 */
+ 122               	.L__stack_usage = 6
+  78:dimmer.c      **** 	initIO(); //Setup IO pins and defaults
+ 123               		.loc 1 78 0
+ 124 000c 00D0      		rcall initIO
+ 125               	.LVL0:
+  79:dimmer.c      **** 	initDimmers(); //Set up the dimmers.
+ 126               		.loc 1 79 0
+ 127 000e 00D0      		rcall initDimmers
+ 128               	.LVL1:
   80:dimmer.c      **** 
-  81:dimmer.c      **** void rampToLevel(uint8_t index, int level) {
- 104               		.loc 1 81 0
- 105               	.LVL0:
- 106               	/* prologue: function */
- 107               	/* frame size = 0 */
- 108               	/* stack size = 0 */
- 109               	.L__stack_usage = 0
-  82:dimmer.c      **** 	if(level > 255)
- 110               		.loc 1 82 0
- 111 006c 6F3F      		cpi r22,-1
- 112 006e 7105      		cpc r23,__zero_reg__
- 113 0070 01F0      		breq .+2
- 114 0072 04F4      		brge .L6
-  83:dimmer.c      **** 		level = 255;
-  84:dimmer.c      **** 	
-  85:dimmer.c      **** 	if(level < 0 ) 
- 115               		.loc 1 85 0
- 116 0074 77FD      		sbrc r23,7
- 117 0076 00C0      		rjmp .L7
- 118 0078 00C0      		rjmp .L5
- 119               	.L6:
-  83:dimmer.c      **** 		level = 255;
- 120               		.loc 1 83 0
- 121 007a 6FEF      		ldi r22,lo8(-1)
- 122 007c 70E0      		ldi r23,0
- 123               	.LVL1:
- 124 007e 00C0      		rjmp .L5
- 125               	.LVL2:
- 126               	.L7:
-  86:dimmer.c      **** 		level = 0;
- 127               		.loc 1 86 0
- 128 0080 60E0      		ldi r22,0
- 129 0082 70E0      		ldi r23,0
- 130               	.LVL3:
- 131               	.L5:
-  87:dimmer.c      **** 	
-  88:dimmer.c      **** 	dimmers[index].level_req = level;
- 132               		.loc 1 88 0
- 133 0084 95E0      		ldi r25,lo8(5)
- 134 0086 899F      		mul r24,r25
- 135 0088 F001      		movw r30,r0
- 136 008a 1124      		clr __zero_reg__
- 137 008c E050      		subi r30,lo8(-(dimmers))
- 138 008e F040      		sbci r31,hi8(-(dimmers))
- 139 0090 6183      		std Z+1,r22
- 140 0092 0895      		ret
- 141               	.LFE10:
- 143               		.section	.text.startup,"ax",@progbits
- 144               	.global	main
- 146               	main:
- 147               	.LFB9:
-  63:dimmer.c      **** {
- 148               		.loc 1 63 0
- 149               	/* prologue: function */
- 150               	/* frame size = 0 */
- 151               	/* stack size = 0 */
- 152               	.L__stack_usage = 0
-  64:dimmer.c      **** 	initIO(); //Setup IO pins and defaults
- 153               		.loc 1 64 0
- 154 0000 00D0      		rcall initIO
- 155               	.LVL4:
-  65:dimmer.c      **** 	initDimmers(); //Set up the dimmers.
- 156               		.loc 1 65 0
- 157 0002 00D0      		rcall initDimmers
- 158               	.LVL5:
- 159               	.L13:
- 160               	.LBB5:
-  70:dimmer.c      **** 		while(!(SPSR & (1<<SPIF)));    // wait until all data is received
- 161               		.loc 1 70 0 discriminator 1
- 162 0004 0DB4      		in __tmp_reg__,0x2d
- 163 0006 07FE      		sbrs __tmp_reg__,7
- 164 0008 00C0      		rjmp .L13
-  71:dimmer.c      ****         data = SPDR;                   // hurray, we now have our data
- 165               		.loc 1 71 0
- 166 000a 6EB5      		in r22,0x2e
- 167               	.LVL6:
-  75:dimmer.c      ****         rampToLevel(0, data);
- 168               		.loc 1 75 0
- 169 000c 70E0      		ldi r23,0
- 170 000e 80E0      		ldi r24,0
- 171 0010 90E0      		ldi r25,0
- 172 0012 00D0      		rcall rampToLevel
- 173               	.LVL7:
- 174               	.LBE5:
-  76:dimmer.c      **** 	}
- 175               		.loc 1 76 0
- 176 0014 00C0      		rjmp .L13
- 177               	.LFE9:
- 179               		.text
- 180               	.global	switchToLevel
- 182               	switchToLevel:
- 183               	.LFB11:
+  81:dimmer.c      **** 	char commandBuffer[4];
+  82:dimmer.c      **** 	uint8_t count = 0;
+ 129               		.loc 1 82 0
+ 130 0010 80E0      		ldi r24,0
+  83:dimmer.c      **** 
+  84:dimmer.c      **** 	while(1) {
+  85:dimmer.c      **** 
+  86:dimmer.c      **** 		while(!(SPSR & (1<<SPIF)));
+  87:dimmer.c      **** 
+  88:dimmer.c      ****         commandBuffer[count++] = SPDR;
   89:dimmer.c      **** 
-  90:dimmer.c      **** }
-  91:dimmer.c      **** 
-  92:dimmer.c      **** void switchToLevel(uint8_t index, int level) {
- 184               		.loc 1 92 0
- 185               	.LVL8:
- 186               	/* prologue: function */
- 187               	/* frame size = 0 */
- 188               	/* stack size = 0 */
- 189               	.L__stack_usage = 0
-  93:dimmer.c      **** 	if(level > 255)
- 190               		.loc 1 93 0
- 191 0094 6F3F      		cpi r22,-1
- 192 0096 7105      		cpc r23,__zero_reg__
- 193 0098 01F0      		breq .+2
- 194 009a 04F4      		brge .L17
-  94:dimmer.c      **** 		level = 255;
-  95:dimmer.c      **** 	
-  96:dimmer.c      **** 	if(level < 0 ) 
- 195               		.loc 1 96 0
- 196 009c 77FD      		sbrc r23,7
- 197 009e 00C0      		rjmp .L18
- 198 00a0 00C0      		rjmp .L16
- 199               	.L17:
-  94:dimmer.c      **** 		level = 255;
- 200               		.loc 1 94 0
- 201 00a2 6FEF      		ldi r22,lo8(-1)
- 202 00a4 70E0      		ldi r23,0
- 203               	.LVL9:
- 204 00a6 00C0      		rjmp .L16
- 205               	.LVL10:
- 206               	.L18:
-  97:dimmer.c      **** 		level = 0;
- 207               		.loc 1 97 0
- 208 00a8 60E0      		ldi r22,0
- 209 00aa 70E0      		ldi r23,0
- 210               	.LVL11:
- 211               	.L16:
-  98:dimmer.c      **** 
-  99:dimmer.c      **** 	dimmers[index].level_req = level;
- 212               		.loc 1 99 0
- 213 00ac 95E0      		ldi r25,lo8(5)
- 214 00ae 899F      		mul r24,r25
- 215 00b0 F001      		movw r30,r0
- 216 00b2 1124      		clr __zero_reg__
- 217 00b4 E050      		subi r30,lo8(-(dimmers))
- 218 00b6 F040      		sbci r31,hi8(-(dimmers))
- 219 00b8 6183      		std Z+1,r22
- 100:dimmer.c      **** 	dimmers[index].level_cur = level;
- 220               		.loc 1 100 0
- 221 00ba 6083      		st Z,r22
- 222 00bc 0895      		ret
- 223               	.LFE11:
- 225               	.global	__vector_1
- 227               	__vector_1:
- 228               	.LFB12:
- 101:dimmer.c      **** }
- 102:dimmer.c      **** 
- 103:dimmer.c      **** volatile uint16_t count;
- 104:dimmer.c      **** //Zero Cross Detection.
- 105:dimmer.c      **** ISR(INT0_vect) {
- 229               		.loc 1 105 0
- 230 00be 1F92      		push r1
- 231               	.LCFI0:
- 232 00c0 0F92      		push r0
- 233               	.LCFI1:
- 234 00c2 0FB6      		in r0,__SREG__
- 235 00c4 0F92      		push r0
- 236 00c6 1124      		clr __zero_reg__
- 237 00c8 8F93      		push r24
- 238               	.LCFI2:
- 239 00ca 9F93      		push r25
- 240               	.LCFI3:
- 241 00cc EF93      		push r30
- 242               	.LCFI4:
- 243 00ce FF93      		push r31
- 244               	.LCFI5:
- 245               	/* prologue: Signal */
- 246               	/* frame size = 0 */
- 247               	/* stack size = 7 */
- 248               	.L__stack_usage = 7
- 106:dimmer.c      **** 	count = 256;
- 249               		.loc 1 106 0
- 250 00d0 80E0      		ldi r24,0
- 251 00d2 91E0      		ldi r25,lo8(1)
- 252 00d4 9093 0000 		sts count+1,r25
- 253 00d8 8093 0000 		sts count,r24
- 107:dimmer.c      **** 
- 108:dimmer.c      **** 	TCCR1B |= 	((1 << CS10) | (1 << WGM12));
- 254               		.loc 1 108 0
- 255 00dc E1E8      		ldi r30,lo8(-127)
- 256 00de F0E0      		ldi r31,0
- 257 00e0 8081      		ld r24,Z
- 258 00e2 8960      		ori r24,lo8(9)
- 259 00e4 8083      		st Z,r24
- 109:dimmer.c      **** 	OCR1A = 	400;
- 260               		.loc 1 109 0
- 261 00e6 80E9      		ldi r24,lo8(-112)
- 262 00e8 91E0      		ldi r25,lo8(1)
- 263 00ea 9093 8900 		sts 136+1,r25
- 264 00ee 8093 8800 		sts 136,r24
- 110:dimmer.c      **** 	TIMSK1 |= 	(1 << OCIE1A);	
- 265               		.loc 1 110 0
- 266 00f2 EFE6      		ldi r30,lo8(111)
- 267 00f4 F0E0      		ldi r31,0
- 268 00f6 8081      		ld r24,Z
- 269 00f8 8260      		ori r24,lo8(2)
- 270 00fa 8083      		st Z,r24
- 271               	/* epilogue start */
- 111:dimmer.c      **** }
- 272               		.loc 1 111 0
- 273 00fc FF91      		pop r31
- 274 00fe EF91      		pop r30
- 275 0100 9F91      		pop r25
- 276 0102 8F91      		pop r24
- 277 0104 0F90      		pop r0
- 278 0106 0FBE      		out __SREG__,r0
- 279 0108 0F90      		pop r0
- 280 010a 1F90      		pop r1
- 281 010c 1895      		reti
- 282               	.LFE12:
- 284               	.global	__vector_11
- 286               	__vector_11:
- 287               	.LFB13:
- 112:dimmer.c      **** 
- 113:dimmer.c      **** //Zero Cross Timer Interrupt.
- 114:dimmer.c      **** ISR(TIMER1_COMPA_vect) {
- 288               		.loc 1 114 0
- 289 010e 1F92      		push r1
- 290               	.LCFI6:
- 291 0110 0F92      		push r0
- 292               	.LCFI7:
- 293 0112 0FB6      		in r0,__SREG__
- 294 0114 0F92      		push r0
- 295 0116 1124      		clr __zero_reg__
- 296 0118 2F93      		push r18
- 297               	.LCFI8:
- 298 011a 3F93      		push r19
- 299               	.LCFI9:
- 300 011c 4F93      		push r20
- 301               	.LCFI10:
- 302 011e 5F93      		push r21
- 303               	.LCFI11:
- 304 0120 6F93      		push r22
- 305               	.LCFI12:
- 306 0122 8F93      		push r24
- 307               	.LCFI13:
- 308 0124 9F93      		push r25
- 309               	.LCFI14:
- 310 0126 AF93      		push r26
- 311               	.LCFI15:
- 312 0128 BF93      		push r27
- 313               	.LCFI16:
- 314 012a CF93      		push r28
- 315               	.LCFI17:
- 316 012c DF93      		push r29
- 317               	.LCFI18:
- 318 012e EF93      		push r30
- 319               	.LCFI19:
- 320 0130 FF93      		push r31
- 321               	.LCFI20:
- 322               	/* prologue: Signal */
- 323               	/* frame size = 0 */
- 324               	/* stack size = 16 */
- 325               	.L__stack_usage = 16
- 115:dimmer.c      **** 	count--;
- 326               		.loc 1 115 0
- 327 0132 8091 0000 		lds r24,count
- 328 0136 9091 0000 		lds r25,count+1
- 329 013a 0197      		sbiw r24,1
- 330 013c 9093 0000 		sts count+1,r25
- 331 0140 8093 0000 		sts count,r24
- 332               	.LVL12:
- 333 0144 A0E0      		ldi r26,lo8(dimmers+2)
- 334 0146 B0E0      		ldi r27,hi8(dimmers+2)
- 335 0148 E0E0      		ldi r30,lo8(dimmers+4)
- 336 014a F0E0      		ldi r31,hi8(dimmers+4)
- 337 014c 80E0      		ldi r24,0
- 338 014e 90E0      		ldi r25,0
- 339               	.LBB6:
- 116:dimmer.c      **** 	for(uint8_t i = 0; i < DIMMER_COUNT; i++) {
- 117:dimmer.c      **** 		if(dimmers[i].level_cur > 0 && dimmers[i].level_cur >= count) {
- 340               		.loc 1 117 0
- 341 0150 65E0      		ldi r22,lo8(5)
- 342               	.LVL13:
- 343               	.L22:
- 344 0152 689F      		mul r22,r24
- 345 0154 E001      		movw r28,r0
- 346 0156 699F      		mul r22,r25
- 347 0158 D00D      		add r29,r0
- 348 015a 1124      		clr __zero_reg__
- 349 015c C050      		subi r28,lo8(-(dimmers))
- 350 015e D040      		sbci r29,hi8(-(dimmers))
- 351 0160 2881      		ld r18,Y
- 352 0162 2223      		tst r18
- 353 0164 01F0      		breq .L21
- 354               		.loc 1 117 0 is_stmt 0 discriminator 1
- 355 0166 4881      		ld r20,Y
- 356 0168 2091 0000 		lds r18,count
- 357 016c 3091 0000 		lds r19,count+1
- 358 0170 50E0      		ldi r21,0
- 359 0172 4217      		cp r20,r18
- 360 0174 5307      		cpc r21,r19
- 361 0176 00F0      		brlo .L21
- 118:dimmer.c      **** 			*dimmers[i].port |= dimmers[i].mask;
- 362               		.loc 1 118 0 is_stmt 1
- 363 0178 CD91      		ld r28,X+
- 364 017a DC91      		ld r29,X
- 365 017c 1197      		sbiw r26,1
- 366 017e 2881      		ld r18,Y
- 367 0180 3081      		ld r19,Z
- 368 0182 232B      		or r18,r19
- 369 0184 2883      		st Y,r18
- 370               	.LVL14:
- 371               	.LBB7:
- 372               	.LBB8:
- 373               		.file 2 "/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h"
+  90:dimmer.c      ****         if(commandBuffer[0] == CMD_SET && count == 4) {
+  91:dimmer.c      ****         	//We have all our data        	
+  92:dimmer.c      ****         	if(commandBuffer[1] == METHOD_SWITCH) {
+  93:dimmer.c      ****         		switchToLevel((uint8_t)commandBuffer[2], (uint8_t)commandBuffer[3]);
+  94:dimmer.c      ****         	} else {
+  95:dimmer.c      **** 				rampToLevel((uint8_t)commandBuffer[2], (uint8_t)commandBuffer[3]);
+  96:dimmer.c      ****         	}
+  97:dimmer.c      **** 
+  98:dimmer.c      ****         	//Toggle the Debug LED
+  99:dimmer.c      ****         	DEBUG_PORT ^= (1 << DEBUG_LED);
+ 131               		.loc 1 99 0
+ 132 0012 20E2      		ldi r18,lo8(32)
+ 133               	.LBB9:
+ 134               	.LBB10:
+ 100:dimmer.c      **** 
+ 101:dimmer.c      ****         	count = 0;
+ 102:dimmer.c      ****         }
+ 103:dimmer.c      **** 
+ 104:dimmer.c      **** 	}
+ 105:dimmer.c      **** 
+ 106:dimmer.c      **** 	return(0);
+ 107:dimmer.c      **** }
+ 108:dimmer.c      **** 
+ 109:dimmer.c      **** void rampToLevel(uint8_t index, uint8_t level) {
+ 110:dimmer.c      **** 	if(level > 255)
+ 111:dimmer.c      **** 		level = 255;
+ 112:dimmer.c      **** 	
+ 113:dimmer.c      **** 	if(level < 0 ) 
+ 114:dimmer.c      **** 		level = 0;
+ 115:dimmer.c      **** 	
+ 116:dimmer.c      **** 	dimmers[index].level_req = level;
+ 135               		.loc 1 116 0
+ 136 0014 95E0      		ldi r25,lo8(5)
+ 137               	.LVL2:
+ 138               	.L11:
+ 139               	.LBE10:
+ 140               	.LBE9:
+  86:dimmer.c      **** 		while(!(SPSR & (1<<SPIF)));
+ 141               		.loc 1 86 0 discriminator 1
+ 142 0016 0DB4      		in __tmp_reg__,0x2d
+ 143 0018 07FE      		sbrs __tmp_reg__,7
+ 144 001a 00C0      		rjmp .L11
+  88:dimmer.c      ****         commandBuffer[count++] = SPDR;
+ 145               		.loc 1 88 0
+ 146 001c 3EB5      		in r19,0x2e
+ 147 001e E1E0      		ldi r30,lo8(1)
+ 148 0020 F0E0      		ldi r31,0
+ 149 0022 EC0F      		add r30,r28
+ 150 0024 FD1F      		adc r31,r29
+ 151 0026 E80F      		add r30,r24
+ 152 0028 F11D      		adc r31,__zero_reg__
+ 153 002a 3083      		st Z,r19
+ 154 002c 8F5F      		subi r24,lo8(-(1))
+ 155               	.LVL3:
+  90:dimmer.c      ****         if(commandBuffer[0] == CMD_SET && count == 4) {
+ 156               		.loc 1 90 0
+ 157 002e 3981      		ldd r19,Y+1
+ 158 0030 3130      		cpi r19,lo8(1)
+ 159 0032 01F4      		brne .L11
+  90:dimmer.c      ****         if(commandBuffer[0] == CMD_SET && count == 4) {
+ 160               		.loc 1 90 0 is_stmt 0 discriminator 1
+ 161 0034 8430      		cpi r24,lo8(4)
+ 162 0036 01F4      		brne .L11
+  92:dimmer.c      ****         	if(commandBuffer[1] == METHOD_SWITCH) {
+ 163               		.loc 1 92 0 is_stmt 1
+ 164 0038 3A81      		ldd r19,Y+2
+ 165 003a 8C81      		ldd r24,Y+4
+ 166               	.LVL4:
+ 167 003c EB81      		ldd r30,Y+3
+ 168               	.LBB11:
+ 169               	.LBB12:
+ 117:dimmer.c      **** }
+ 118:dimmer.c      **** 
+ 119:dimmer.c      **** void switchToLevel(uint8_t index, uint8_t level) {
+ 120:dimmer.c      **** 	if(level > 255)
+ 121:dimmer.c      **** 		level = 255;
+ 122:dimmer.c      **** 	
+ 123:dimmer.c      **** 	if(level < 0 ) 
+ 124:dimmer.c      **** 		level = 0;
+ 125:dimmer.c      **** 
+ 126:dimmer.c      **** 	dimmers[index].level_req = level;
+ 170               		.loc 1 126 0
+ 171 003e 9E9F      		mul r25,r30
+ 172 0040 F001      		movw r30,r0
+ 173 0042 1124      		clr __zero_reg__
+ 174 0044 E050      		subi r30,lo8(-(dimmers))
+ 175 0046 F040      		sbci r31,hi8(-(dimmers))
+ 176 0048 8183      		std Z+1,r24
+ 177               	.LBE12:
+ 178               	.LBE11:
+  92:dimmer.c      ****         	if(commandBuffer[1] == METHOD_SWITCH) {
+ 179               		.loc 1 92 0
+ 180 004a 3111      		cpse r19,__zero_reg__
+ 181 004c 00C0      		rjmp .L8
+ 182               	.LVL5:
+ 183               	.LBB14:
+ 184               	.LBB13:
+ 127:dimmer.c      **** 	dimmers[index].level_cur = level;
+ 185               		.loc 1 127 0
+ 186 004e 8083      		st Z,r24
+ 187               	.LVL6:
+ 188               	.L8:
+ 189               	.LBE13:
+ 190               	.LBE14:
+  99:dimmer.c      ****         	DEBUG_PORT ^= (1 << DEBUG_LED);
+ 191               		.loc 1 99 0
+ 192 0050 88B1      		in r24,0x8
+ 193 0052 8227      		eor r24,r18
+ 194 0054 88B9      		out 0x8,r24
+ 195               	.LVL7:
+ 101:dimmer.c      ****         	count = 0;
+ 196               		.loc 1 101 0
+ 197 0056 80E0      		ldi r24,0
+ 198 0058 00C0      		rjmp .L11
+ 199               	.LFE9:
+ 201               		.text
+ 202               	.global	rampToLevel
+ 204               	rampToLevel:
+ 205               	.LFB10:
+ 109:dimmer.c      **** void rampToLevel(uint8_t index, uint8_t level) {
+ 206               		.loc 1 109 0
+ 207               	.LVL8:
+ 208               	/* prologue: function */
+ 209               	/* frame size = 0 */
+ 210               	/* stack size = 0 */
+ 211               	.L__stack_usage = 0
+ 116:dimmer.c      **** 	dimmers[index].level_req = level;
+ 212               		.loc 1 116 0
+ 213 0070 95E0      		ldi r25,lo8(5)
+ 214 0072 899F      		mul r24,r25
+ 215 0074 F001      		movw r30,r0
+ 216 0076 1124      		clr __zero_reg__
+ 217 0078 E050      		subi r30,lo8(-(dimmers))
+ 218 007a F040      		sbci r31,hi8(-(dimmers))
+ 219 007c 6183      		std Z+1,r22
+ 220 007e 0895      		ret
+ 221               	.LFE10:
+ 223               	.global	switchToLevel
+ 225               	switchToLevel:
+ 226               	.LFB11:
+ 119:dimmer.c      **** void switchToLevel(uint8_t index, uint8_t level) {
+ 227               		.loc 1 119 0
+ 228               	.LVL9:
+ 229               	/* prologue: function */
+ 230               	/* frame size = 0 */
+ 231               	/* stack size = 0 */
+ 232               	.L__stack_usage = 0
+ 126:dimmer.c      **** 	dimmers[index].level_req = level;
+ 233               		.loc 1 126 0
+ 234 0080 95E0      		ldi r25,lo8(5)
+ 235 0082 899F      		mul r24,r25
+ 236 0084 F001      		movw r30,r0
+ 237 0086 1124      		clr __zero_reg__
+ 238 0088 E050      		subi r30,lo8(-(dimmers))
+ 239 008a F040      		sbci r31,hi8(-(dimmers))
+ 240 008c 6183      		std Z+1,r22
+ 241               		.loc 1 127 0
+ 242 008e 6083      		st Z,r22
+ 243 0090 0895      		ret
+ 244               	.LFE11:
+ 246               	.global	debugLed
+ 248               	debugLed:
+ 249               	.LFB12:
+ 128:dimmer.c      **** }
+ 129:dimmer.c      **** 
+ 130:dimmer.c      **** void debugLed(uint8_t state) {
+ 250               		.loc 1 130 0
+ 251               	.LVL10:
+ 252               	/* prologue: function */
+ 253               	/* frame size = 0 */
+ 254               	/* stack size = 0 */
+ 255               	.L__stack_usage = 0
+ 131:dimmer.c      **** 	DEBUG_PORT = (state<<DEBUG_LED);
+ 256               		.loc 1 131 0
+ 257 0092 8295      		swap r24
+ 258               	.LVL11:
+ 259 0094 880F      		lsl r24
+ 260 0096 807E      		andi r24,lo8(-32)
+ 261 0098 88B9      		out 0x8,r24
+ 262 009a 0895      		ret
+ 263               	.LFE12:
+ 265               	.global	__vector_1
+ 267               	__vector_1:
+ 268               	.LFB13:
+ 132:dimmer.c      **** }
+ 133:dimmer.c      **** 
+ 134:dimmer.c      **** volatile uint16_t count;
+ 135:dimmer.c      **** //Zero Cross Detection.
+ 136:dimmer.c      **** ISR(INT0_vect) {
+ 269               		.loc 1 136 0
+ 270 009c 1F92      		push r1
+ 271               	.LCFI4:
+ 272 009e 0F92      		push r0
+ 273               	.LCFI5:
+ 274 00a0 0FB6      		in r0,__SREG__
+ 275 00a2 0F92      		push r0
+ 276 00a4 1124      		clr __zero_reg__
+ 277 00a6 8F93      		push r24
+ 278               	.LCFI6:
+ 279 00a8 9F93      		push r25
+ 280               	.LCFI7:
+ 281 00aa EF93      		push r30
+ 282               	.LCFI8:
+ 283 00ac FF93      		push r31
+ 284               	.LCFI9:
+ 285               	/* prologue: Signal */
+ 286               	/* frame size = 0 */
+ 287               	/* stack size = 7 */
+ 288               	.L__stack_usage = 7
+ 137:dimmer.c      **** 	count = 256;
+ 289               		.loc 1 137 0
+ 290 00ae 80E0      		ldi r24,0
+ 291 00b0 91E0      		ldi r25,lo8(1)
+ 292 00b2 9093 0000 		sts count+1,r25
+ 293 00b6 8093 0000 		sts count,r24
+ 138:dimmer.c      **** 
+ 139:dimmer.c      **** 	TCCR1B |= 	((1 << CS10) | (1 << WGM12));
+ 294               		.loc 1 139 0
+ 295 00ba E1E8      		ldi r30,lo8(-127)
+ 296 00bc F0E0      		ldi r31,0
+ 297 00be 8081      		ld r24,Z
+ 298 00c0 8960      		ori r24,lo8(9)
+ 299 00c2 8083      		st Z,r24
+ 140:dimmer.c      **** 	OCR1A = 	400;
+ 300               		.loc 1 140 0
+ 301 00c4 80E9      		ldi r24,lo8(-112)
+ 302 00c6 91E0      		ldi r25,lo8(1)
+ 303 00c8 9093 8900 		sts 136+1,r25
+ 304 00cc 8093 8800 		sts 136,r24
+ 141:dimmer.c      **** 	TIMSK1 |= 	(1 << OCIE1A);	
+ 305               		.loc 1 141 0
+ 306 00d0 EFE6      		ldi r30,lo8(111)
+ 307 00d2 F0E0      		ldi r31,0
+ 308 00d4 8081      		ld r24,Z
+ 309 00d6 8260      		ori r24,lo8(2)
+ 310 00d8 8083      		st Z,r24
+ 311               	/* epilogue start */
+ 142:dimmer.c      **** }
+ 312               		.loc 1 142 0
+ 313 00da FF91      		pop r31
+ 314 00dc EF91      		pop r30
+ 315 00de 9F91      		pop r25
+ 316 00e0 8F91      		pop r24
+ 317 00e2 0F90      		pop r0
+ 318 00e4 0FBE      		out __SREG__,r0
+ 319 00e6 0F90      		pop r0
+ 320 00e8 1F90      		pop r1
+ 321 00ea 1895      		reti
+ 322               	.LFE13:
+ 324               	.global	__vector_11
+ 326               	__vector_11:
+ 327               	.LFB14:
+ 143:dimmer.c      **** 
+ 144:dimmer.c      **** //Zero Cross Timer Interrupt.
+ 145:dimmer.c      **** ISR(TIMER1_COMPA_vect) {
+ 328               		.loc 1 145 0
+ 329 00ec 1F92      		push r1
+ 330               	.LCFI10:
+ 331 00ee 0F92      		push r0
+ 332               	.LCFI11:
+ 333 00f0 0FB6      		in r0,__SREG__
+ 334 00f2 0F92      		push r0
+ 335 00f4 1124      		clr __zero_reg__
+ 336 00f6 2F93      		push r18
+ 337               	.LCFI12:
+ 338 00f8 3F93      		push r19
+ 339               	.LCFI13:
+ 340 00fa 4F93      		push r20
+ 341               	.LCFI14:
+ 342 00fc 5F93      		push r21
+ 343               	.LCFI15:
+ 344 00fe 6F93      		push r22
+ 345               	.LCFI16:
+ 346 0100 8F93      		push r24
+ 347               	.LCFI17:
+ 348 0102 9F93      		push r25
+ 349               	.LCFI18:
+ 350 0104 AF93      		push r26
+ 351               	.LCFI19:
+ 352 0106 BF93      		push r27
+ 353               	.LCFI20:
+ 354 0108 CF93      		push r28
+ 355               	.LCFI21:
+ 356 010a DF93      		push r29
+ 357               	.LCFI22:
+ 358 010c EF93      		push r30
+ 359               	.LCFI23:
+ 360 010e FF93      		push r31
+ 361               	.LCFI24:
+ 362               	/* prologue: Signal */
+ 363               	/* frame size = 0 */
+ 364               	/* stack size = 16 */
+ 365               	.L__stack_usage = 16
+ 146:dimmer.c      **** 	count--;
+ 366               		.loc 1 146 0
+ 367 0110 8091 0000 		lds r24,count
+ 368 0114 9091 0000 		lds r25,count+1
+ 369 0118 0197      		sbiw r24,1
+ 370 011a 9093 0000 		sts count+1,r25
+ 371 011e 8093 0000 		sts count,r24
+ 372               	.LVL12:
+ 373 0122 A0E0      		ldi r26,lo8(dimmers+2)
+ 374 0124 B0E0      		ldi r27,hi8(dimmers+2)
+ 375 0126 E0E0      		ldi r30,lo8(dimmers+4)
+ 376 0128 F0E0      		ldi r31,hi8(dimmers+4)
+ 377 012a 80E0      		ldi r24,0
+ 378 012c 90E0      		ldi r25,0
+ 379               	.LBB15:
+ 147:dimmer.c      **** 	for(uint8_t i = 0; i < DIMMER_COUNT; i++) {
+ 148:dimmer.c      **** 		if(dimmers[i].level_cur > 0 && dimmers[i].level_cur >= count) {
+ 380               		.loc 1 148 0
+ 381 012e 65E0      		ldi r22,lo8(5)
+ 382               	.LVL13:
+ 383               	.L18:
+ 384 0130 689F      		mul r22,r24
+ 385 0132 E001      		movw r28,r0
+ 386 0134 699F      		mul r22,r25
+ 387 0136 D00D      		add r29,r0
+ 388 0138 1124      		clr __zero_reg__
+ 389 013a C050      		subi r28,lo8(-(dimmers))
+ 390 013c D040      		sbci r29,hi8(-(dimmers))
+ 391 013e 2881      		ld r18,Y
+ 392 0140 2223      		tst r18
+ 393 0142 01F0      		breq .L17
+ 394               		.loc 1 148 0 is_stmt 0 discriminator 1
+ 395 0144 4881      		ld r20,Y
+ 396 0146 2091 0000 		lds r18,count
+ 397 014a 3091 0000 		lds r19,count+1
+ 398 014e 50E0      		ldi r21,0
+ 399 0150 4217      		cp r20,r18
+ 400 0152 5307      		cpc r21,r19
+ 401 0154 00F0      		brlo .L17
+ 149:dimmer.c      **** 			*dimmers[i].port |= dimmers[i].mask;
+ 402               		.loc 1 149 0 is_stmt 1
+ 403 0156 CD91      		ld r28,X+
+ 404 0158 DC91      		ld r29,X
+ 405 015a 1197      		sbiw r26,1
+ 406 015c 2881      		ld r18,Y
+ 407 015e 3081      		ld r19,Z
+ 408 0160 232B      		or r18,r19
+ 409 0162 2883      		st Y,r18
+ 410               	.LVL14:
+ 411               	.LBB16:
+ 412               	.LBB17:
+ 413               		.file 2 "/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h"
    1:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** /* Copyright (c) 2002, Marek Michalkiewicz
    2:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    Copyright (c) 2004,2005,2007 Joerg Wunsch
    3:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h ****    Copyright (c) 2007  Florin-Viorel Petrov
@@ -731,170 +803,171 @@
  244:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 	#endif
  245:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 
  246:/usr/lib/gcc/avr/4.7.2/../../../avr/include/util/delay.h **** 	__builtin_avr_delay_cycles(__ticks_dc);
- 374               		.loc 2 246 0
- 375 0186 28E2      		ldi r18,lo8(40)
- 376 0188 2A95      		1: dec r18
- 377 018a 01F4      		brne 1b
- 378               	.LBE8:
- 379               	.LBE7:
- 119:dimmer.c      **** 			_delay_us(10);
- 120:dimmer.c      **** 			*dimmers[i].port ^= dimmers[i].mask;
- 380               		.loc 1 120 0
- 381 018c CD91      		ld r28,X+
- 382 018e DC91      		ld r29,X
- 383 0190 1197      		sbiw r26,1
- 384 0192 2881      		ld r18,Y
- 385 0194 3081      		ld r19,Z
- 386 0196 2327      		eor r18,r19
- 387 0198 2883      		st Y,r18
- 388               	.LVL15:
- 389               	.L21:
- 390 019a 0196      		adiw r24,1
- 391 019c 1596      		adiw r26,5
- 392 019e 3596      		adiw r30,5
- 116:dimmer.c      **** 	for(uint8_t i = 0; i < DIMMER_COUNT; i++) {
- 393               		.loc 1 116 0
- 394 01a0 8230      		cpi r24,2
- 395 01a2 9105      		cpc r25,__zero_reg__
- 396 01a4 01F4      		brne .L22
- 397               	/* epilogue start */
- 398               	.LBE6:
- 121:dimmer.c      **** 		}
- 122:dimmer.c      **** 	}
- 123:dimmer.c      **** }
- 399               		.loc 1 123 0
- 400 01a6 FF91      		pop r31
- 401 01a8 EF91      		pop r30
- 402 01aa DF91      		pop r29
- 403 01ac CF91      		pop r28
- 404 01ae BF91      		pop r27
- 405 01b0 AF91      		pop r26
- 406 01b2 9F91      		pop r25
- 407 01b4 8F91      		pop r24
- 408 01b6 6F91      		pop r22
- 409 01b8 5F91      		pop r21
- 410 01ba 4F91      		pop r20
- 411 01bc 3F91      		pop r19
- 412 01be 2F91      		pop r18
- 413 01c0 0F90      		pop r0
- 414 01c2 0FBE      		out __SREG__,r0
- 415 01c4 0F90      		pop r0
- 416 01c6 1F90      		pop r1
- 417 01c8 1895      		reti
- 418               	.LFE13:
- 420               	.global	__vector_14
- 422               	__vector_14:
- 423               	.LFB14:
- 124:dimmer.c      **** 
- 125:dimmer.c      **** //Dimming Interrupt
- 126:dimmer.c      **** ISR(TIMER0_COMPA_vect) {
- 424               		.loc 1 126 0
- 425 01ca 1F92      		push r1
- 426               	.LCFI21:
- 427 01cc 0F92      		push r0
- 428               	.LCFI22:
- 429 01ce 0FB6      		in r0,__SREG__
- 430 01d0 0F92      		push r0
- 431 01d2 1124      		clr __zero_reg__
- 432 01d4 8F93      		push r24
- 433               	.LCFI23:
- 434 01d6 9F93      		push r25
- 435               	.LCFI24:
- 436               	/* prologue: Signal */
- 437               	/* frame size = 0 */
- 438               	/* stack size = 5 */
- 439               	.L__stack_usage = 5
- 440               	.LVL16:
- 441               	.LBB9:
- 127:dimmer.c      **** 	for(uint8_t i = 0; i < DIMMER_COUNT; i++) {
- 128:dimmer.c      **** 		if(dimmers[i].level_req > dimmers[i].level_cur) {
- 442               		.loc 1 128 0
- 443 01d8 9091 0000 		lds r25,dimmers+1
- 444 01dc 8091 0000 		lds r24,dimmers
- 445 01e0 8917      		cp r24,r25
- 446 01e2 00F0      		brlo .L28
- 129:dimmer.c      **** 			dimmers[i].level_cur++;
- 130:dimmer.c      **** 		} else if(dimmers[i].level_req < dimmers[i].level_cur) {
- 447               		.loc 1 130 0
- 448 01e4 9091 0000 		lds r25,dimmers+1
- 449 01e8 8091 0000 		lds r24,dimmers
- 450 01ec 9817      		cp r25,r24
- 451 01ee 00F4      		brsh .L29
- 131:dimmer.c      **** 			dimmers[i].level_cur--;
- 452               		.loc 1 131 0
- 453 01f0 8091 0000 		lds r24,dimmers
- 454 01f4 8150      		subi r24,lo8(-(-1))
- 455 01f6 00C0      		rjmp .L32
- 456               	.L28:
- 129:dimmer.c      **** 			dimmers[i].level_cur++;
- 457               		.loc 1 129 0
- 458 01f8 8091 0000 		lds r24,dimmers
- 459 01fc 8F5F      		subi r24,lo8(-(1))
- 460               	.L32:
- 461 01fe 8093 0000 		sts dimmers,r24
- 462               	.L29:
- 463               	.LVL17:
- 128:dimmer.c      **** 		if(dimmers[i].level_req > dimmers[i].level_cur) {
- 464               		.loc 1 128 0
- 465 0202 9091 0000 		lds r25,dimmers+6
- 466 0206 8091 0000 		lds r24,dimmers+5
- 467 020a 8917      		cp r24,r25
- 468 020c 00F4      		brsh .L30
- 129:dimmer.c      **** 			dimmers[i].level_cur++;
- 469               		.loc 1 129 0
- 470 020e 8091 0000 		lds r24,dimmers+5
- 471 0212 8F5F      		subi r24,lo8(-(1))
- 472 0214 00C0      		rjmp .L33
- 473               	.L30:
- 130:dimmer.c      **** 		} else if(dimmers[i].level_req < dimmers[i].level_cur) {
- 474               		.loc 1 130 0
- 475 0216 9091 0000 		lds r25,dimmers+6
- 476 021a 8091 0000 		lds r24,dimmers+5
- 477 021e 9817      		cp r25,r24
- 478 0220 00F4      		brsh .L27
- 479               		.loc 1 131 0
- 480 0222 8091 0000 		lds r24,dimmers+5
- 481 0226 8150      		subi r24,lo8(-(-1))
- 482               	.L33:
- 483 0228 8093 0000 		sts dimmers+5,r24
- 484               	.LVL18:
- 485               	.L27:
- 486               	/* epilogue start */
- 487               	.LBE9:
- 132:dimmer.c      **** 		}
- 133:dimmer.c      **** 	
- 134:dimmer.c      **** 	}
- 135:dimmer.c      **** }...
- 488               		.loc 1 135 0
- 489 022c 9F91      		pop r25
- 490 022e 8F91      		pop r24
- 491 0230 0F90      		pop r0
- 492 0232 0FBE      		out __SREG__,r0
- 493 0234 0F90      		pop r0
- 494 0236 1F90      		pop r1
- 495 0238 1895      		reti
- 496               	.LFE14:
- 498               		.comm	count,2,1
- 499               		.comm	dimmers,10,1
- 732               	.Letext0:
- 733               		.file 3 "/usr/lib/gcc/avr/4.7.2/../../../avr/include/stdint.h"
+ 414               		.loc 2 246 0
+ 415 0164 28E2      		ldi r18,lo8(40)
+ 416 0166 2A95      		1: dec r18
+ 417 0168 01F4      		brne 1b
+ 418               	.LBE17:
+ 419               	.LBE16:
+ 150:dimmer.c      **** 			_delay_us(10);
+ 151:dimmer.c      **** 			*dimmers[i].port ^= dimmers[i].mask;
+ 420               		.loc 1 151 0
+ 421 016a CD91      		ld r28,X+
+ 422 016c DC91      		ld r29,X
+ 423 016e 1197      		sbiw r26,1
+ 424 0170 2881      		ld r18,Y
+ 425 0172 3081      		ld r19,Z
+ 426 0174 2327      		eor r18,r19
+ 427 0176 2883      		st Y,r18
+ 428               	.LVL15:
+ 429               	.L17:
+ 430 0178 0196      		adiw r24,1
+ 431 017a 1596      		adiw r26,5
+ 432 017c 3596      		adiw r30,5
+ 147:dimmer.c      **** 	for(uint8_t i = 0; i < DIMMER_COUNT; i++) {
+ 433               		.loc 1 147 0
+ 434 017e 8230      		cpi r24,2
+ 435 0180 9105      		cpc r25,__zero_reg__
+ 436 0182 01F4      		brne .L18
+ 437               	/* epilogue start */
+ 438               	.LBE15:
+ 152:dimmer.c      **** 		}
+ 153:dimmer.c      **** 	}
+ 154:dimmer.c      **** }
+ 439               		.loc 1 154 0
+ 440 0184 FF91      		pop r31
+ 441 0186 EF91      		pop r30
+ 442 0188 DF91      		pop r29
+ 443 018a CF91      		pop r28
+ 444 018c BF91      		pop r27
+ 445 018e AF91      		pop r26
+ 446 0190 9F91      		pop r25
+ 447 0192 8F91      		pop r24
+ 448 0194 6F91      		pop r22
+ 449 0196 5F91      		pop r21
+ 450 0198 4F91      		pop r20
+ 451 019a 3F91      		pop r19
+ 452 019c 2F91      		pop r18
+ 453 019e 0F90      		pop r0
+ 454 01a0 0FBE      		out __SREG__,r0
+ 455 01a2 0F90      		pop r0
+ 456 01a4 1F90      		pop r1
+ 457 01a6 1895      		reti
+ 458               	.LFE14:
+ 460               	.global	__vector_14
+ 462               	__vector_14:
+ 463               	.LFB15:
+ 155:dimmer.c      **** 
+ 156:dimmer.c      **** //Dimming Interrupt
+ 157:dimmer.c      **** ISR(TIMER0_COMPA_vect) {
+ 464               		.loc 1 157 0
+ 465 01a8 1F92      		push r1
+ 466               	.LCFI25:
+ 467 01aa 0F92      		push r0
+ 468               	.LCFI26:
+ 469 01ac 0FB6      		in r0,__SREG__
+ 470 01ae 0F92      		push r0
+ 471 01b0 1124      		clr __zero_reg__
+ 472 01b2 8F93      		push r24
+ 473               	.LCFI27:
+ 474 01b4 9F93      		push r25
+ 475               	.LCFI28:
+ 476               	/* prologue: Signal */
+ 477               	/* frame size = 0 */
+ 478               	/* stack size = 5 */
+ 479               	.L__stack_usage = 5
+ 480               	.LVL16:
+ 481               	.LBB18:
+ 158:dimmer.c      **** 	for(uint8_t i = 0; i < DIMMER_COUNT; i++) {
+ 159:dimmer.c      **** 		if(dimmers[i].level_req > dimmers[i].level_cur) {
+ 482               		.loc 1 159 0
+ 483 01b6 9091 0000 		lds r25,dimmers+1
+ 484 01ba 8091 0000 		lds r24,dimmers
+ 485 01be 8917      		cp r24,r25
+ 486 01c0 00F0      		brlo .L24
+ 160:dimmer.c      **** 			dimmers[i].level_cur++;
+ 161:dimmer.c      **** 		} else if(dimmers[i].level_req < dimmers[i].level_cur) {
+ 487               		.loc 1 161 0
+ 488 01c2 9091 0000 		lds r25,dimmers+1
+ 489 01c6 8091 0000 		lds r24,dimmers
+ 490 01ca 9817      		cp r25,r24
+ 491 01cc 00F4      		brsh .L25
+ 162:dimmer.c      **** 			dimmers[i].level_cur--;
+ 492               		.loc 1 162 0
+ 493 01ce 8091 0000 		lds r24,dimmers
+ 494 01d2 8150      		subi r24,lo8(-(-1))
+ 495 01d4 00C0      		rjmp .L28
+ 496               	.L24:
+ 160:dimmer.c      **** 			dimmers[i].level_cur++;
+ 497               		.loc 1 160 0
+ 498 01d6 8091 0000 		lds r24,dimmers
+ 499 01da 8F5F      		subi r24,lo8(-(1))
+ 500               	.L28:
+ 501 01dc 8093 0000 		sts dimmers,r24
+ 502               	.L25:
+ 503               	.LVL17:
+ 159:dimmer.c      **** 		if(dimmers[i].level_req > dimmers[i].level_cur) {
+ 504               		.loc 1 159 0
+ 505 01e0 9091 0000 		lds r25,dimmers+6
+ 506 01e4 8091 0000 		lds r24,dimmers+5
+ 507 01e8 8917      		cp r24,r25
+ 508 01ea 00F4      		brsh .L26
+ 160:dimmer.c      **** 			dimmers[i].level_cur++;
+ 509               		.loc 1 160 0
+ 510 01ec 8091 0000 		lds r24,dimmers+5
+ 511 01f0 8F5F      		subi r24,lo8(-(1))
+ 512 01f2 00C0      		rjmp .L29
+ 513               	.L26:
+ 161:dimmer.c      **** 		} else if(dimmers[i].level_req < dimmers[i].level_cur) {
+ 514               		.loc 1 161 0
+ 515 01f4 9091 0000 		lds r25,dimmers+6
+ 516 01f8 8091 0000 		lds r24,dimmers+5
+ 517 01fc 9817      		cp r25,r24
+ 518 01fe 00F4      		brsh .L23
+ 519               		.loc 1 162 0
+ 520 0200 8091 0000 		lds r24,dimmers+5
+ 521 0204 8150      		subi r24,lo8(-(-1))
+ 522               	.L29:
+ 523 0206 8093 0000 		sts dimmers+5,r24
+ 524               	.LVL18:
+ 525               	.L23:
+ 526               	/* epilogue start */
+ 527               	.LBE18:
+ 163:dimmer.c      **** 		}
+ 164:dimmer.c      **** 	
+ 165:dimmer.c      **** 	}
+ 166:dimmer.c      **** }...
+ 528               		.loc 1 166 0
+ 529 020a 9F91      		pop r25
+ 530 020c 8F91      		pop r24
+ 531 020e 0F90      		pop r0
+ 532 0210 0FBE      		out __SREG__,r0
+ 533 0212 0F90      		pop r0
+ 534 0214 1F90      		pop r1
+ 535 0216 1895      		reti
+ 536               	.LFE15:
+ 538               		.comm	count,2,1
+ 539               		.comm	dimmers,10,1
+ 800               	.Letext0:
+ 801               		.file 3 "/usr/lib/gcc/avr/4.7.2/../../../avr/include/stdint.h"
 DEFINED SYMBOLS
                             *ABS*:0000000000000000 dimmer.c
-     /tmp/ccLUPQbd.s:2      *ABS*:000000000000003e __SP_H__
-     /tmp/ccLUPQbd.s:3      *ABS*:000000000000003d __SP_L__
-     /tmp/ccLUPQbd.s:4      *ABS*:000000000000003f __SREG__
-     /tmp/ccLUPQbd.s:5      *ABS*:0000000000000000 __tmp_reg__
-     /tmp/ccLUPQbd.s:6      *ABS*:0000000000000001 __zero_reg__
-     /tmp/ccLUPQbd.s:11     .text:0000000000000000 initIO
-     /tmp/ccLUPQbd.s:68     .text:000000000000003a initDimmers
+     /tmp/ccZo3r2f.s:2      *ABS*:000000000000003e __SP_H__
+     /tmp/ccZo3r2f.s:3      *ABS*:000000000000003d __SP_L__
+     /tmp/ccZo3r2f.s:4      *ABS*:000000000000003f __SREG__
+     /tmp/ccZo3r2f.s:5      *ABS*:0000000000000000 __tmp_reg__
+     /tmp/ccZo3r2f.s:6      *ABS*:0000000000000001 __zero_reg__
+     /tmp/ccZo3r2f.s:11     .text:0000000000000000 initIO
+     /tmp/ccZo3r2f.s:66     .text:0000000000000038 initDimmers
                             *COM*:000000000000000a dimmers
-     /tmp/ccLUPQbd.s:102    .text:000000000000006c rampToLevel
-     /tmp/ccLUPQbd.s:146    .text.startup:0000000000000000 main
-     /tmp/ccLUPQbd.s:182    .text:0000000000000094 switchToLevel
-     /tmp/ccLUPQbd.s:227    .text:00000000000000be __vector_1
+     /tmp/ccZo3r2f.s:106    .text.startup:0000000000000000 main
+     /tmp/ccZo3r2f.s:204    .text:0000000000000070 rampToLevel
+     /tmp/ccZo3r2f.s:225    .text:0000000000000080 switchToLevel
+     /tmp/ccZo3r2f.s:248    .text:0000000000000092 debugLed
+     /tmp/ccZo3r2f.s:267    .text:000000000000009c __vector_1
                             *COM*:0000000000000002 count
-     /tmp/ccLUPQbd.s:286    .text:000000000000010e __vector_11
-     /tmp/ccLUPQbd.s:422    .text:00000000000001ca __vector_14
+     /tmp/ccZo3r2f.s:326    .text:00000000000000ec __vector_11
+     /tmp/ccZo3r2f.s:462    .text:00000000000001a8 __vector_14
 
 UNDEFINED SYMBOLS
 __do_clear_bss

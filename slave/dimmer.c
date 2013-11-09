@@ -1,3 +1,5 @@
+#include <dimmer.h>
+
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/pgmspace.h>
@@ -12,6 +14,15 @@
 
 #define MAX_SIZE 2048
 
+#define DEBUG_DDR DDRC
+#define DEBUG_PORT PORTC
+#define DEBUG_LED PC5
+
+static const char CMD_SET = 0x01; // Set command e.g. [0x01 (command), 0x00(method), 0x01(index) 0xDF(level)]
+
+static const char METHOD_SWITCH = 0x00;
+static const char METHOD_RAMP = 0x01;
+
 struct dimmer {
 	volatile uint8_t level_cur;
 	volatile uint8_t level_req;
@@ -21,11 +32,9 @@ struct dimmer {
 
 void initIO (void)
 {
-	//Set up the Data Direction Register
-	DDRC = 0xFF;
-	//Set the triacs off.
-	PORTC = 0x00;
-	
+	//Set the debug LED as output
+	DEBUG_DDR = (1<<DEBUG_LED);
+
 	//INT0 - ZCD
 	EICRA = (1<<ISC01) | (0<<ISC00);
 	EIMSK |= (1<<INT0);
@@ -48,15 +57,20 @@ void initIO (void)
 }
 
 void initDimmers(void) {
+	//Set up the Data Direction Register
+	DDRD = (1<<PD0) | (1<<PD1);
+	//Set the triacs off.
+	PORTD = 0x00;
+
 	dimmers[0].level_cur = 0;
 	dimmers[0].level_req = 0;
-	dimmers[0].port = &PORTC;
-	dimmers[0].mask = 0x01;
+	dimmers[0].port = &PORTD;
+	dimmers[0].mask = (1<<PD0);
 	
 	dimmers[1].level_cur = 0;
 	dimmers[1].level_req = 0;
-	dimmers[1].port = &PORTC;
-	dimmers[1].mask = 0x02;
+	dimmers[1].port = &PORTD;
+	dimmers[1].mask = (1<<PD1);
 }
 
 int main (void)
@@ -64,21 +78,35 @@ int main (void)
 	initIO(); //Setup IO pins and defaults
 	initDimmers(); //Set up the dimmers.
 
-	char data;
+	char commandBuffer[4];
+	uint8_t count = 0;
 
 	while(1) {
-		while(!(SPSR & (1<<SPIF)));    // wait until all data is received
-        data = SPDR;                   // hurray, we now have our data
 
-        int level = (int)data;
+		while(!(SPSR & (1<<SPIF)));
 
-        rampToLevel(0, data);
+        commandBuffer[count++] = SPDR;
+
+        if(commandBuffer[0] == CMD_SET && count == 4) {
+        	//We have all our data        	
+        	if(commandBuffer[1] == METHOD_SWITCH) {
+        		switchToLevel((uint8_t)commandBuffer[2], (uint8_t)commandBuffer[3]);
+        	} else {
+				rampToLevel((uint8_t)commandBuffer[2], (uint8_t)commandBuffer[3]);
+        	}
+
+        	//Toggle the Debug LED
+        	DEBUG_PORT ^= (1 << DEBUG_LED);
+
+        	count = 0;
+        }
+
 	}
 
 	return(0);
 }
 
-void rampToLevel(uint8_t index, int level) {
+void rampToLevel(uint8_t index, uint8_t level) {
 	if(level > 255)
 		level = 255;
 	
@@ -86,10 +114,9 @@ void rampToLevel(uint8_t index, int level) {
 		level = 0;
 	
 	dimmers[index].level_req = level;
-
 }
 
-void switchToLevel(uint8_t index, int level) {
+void switchToLevel(uint8_t index, uint8_t level) {
 	if(level > 255)
 		level = 255;
 	
@@ -98,6 +125,10 @@ void switchToLevel(uint8_t index, int level) {
 
 	dimmers[index].level_req = level;
 	dimmers[index].level_cur = level;
+}
+
+void debugLed(uint8_t state) {
+	DEBUG_PORT = (state<<DEBUG_LED);
 }
 
 volatile uint16_t count;
