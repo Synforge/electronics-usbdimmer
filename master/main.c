@@ -23,6 +23,7 @@
 #define DEBUG_LED       PC0
 
 #define USB_CMD_SPI     1
+#define USB_CMD_SET     2
 
 #define CMD_STATUS      0x00 //Obtain the status of the dimmer channels
 #define CMD_SET         0x01 //Set a dimmer channel
@@ -34,13 +35,14 @@
 
 volatile int data = 0;
 
-char spi_putbyte(uchar spi_data) 
+unsigned char spi_putbyte(uchar spi_data) 
 { 
     SPDR = spi_data; 
     while (!(SPSR & (1<<SPIF)));  
     return SPDR; 
 } 
 
+uint8_t volatile currentMethod = 0x00;
 USB_PUBLIC uchar usbFunctionSetup(uchar data[8])
 {
 
@@ -49,7 +51,12 @@ USB_PUBLIC uchar usbFunctionSetup(uchar data[8])
 //    static uchar    replyBuf[2];
 
 //    usbMsgPtr = replyBuf;
+
+    currentMethod = rq->bRequest;
     if(rq->bRequest == USB_CMD_SPI) {
+        return USB_NO_MSG;
+    } else 
+    if(rq->bRequest == USB_CMD_SET) {
         return USB_NO_MSG;
     }
     return 0;
@@ -58,8 +65,21 @@ USB_PUBLIC uchar usbFunctionSetup(uchar data[8])
 USB_PUBLIC uchar usbFunctionWrite(uchar *data, uchar len) {
     uchar i;
 
-    for(i = 0; i < len; i++) {
-        spi_putbyte(data[i]);
+    if(currentMethod == USB_CMD_SPI) {
+        for(i = 0; i < len; i++) {
+            spi_putbyte(data[i]);
+        }
+    } else
+    if(currentMethod == USB_CMD_SET) {
+
+        if(len == 3) {
+            spi_putbyte(CMD_SET);
+            spi_putbyte(data[0]);
+            spi_putbyte(data[1]);
+            spi_putbyte(data[2]);
+
+            DEBUG_PORT ^= (1<<DEBUG_LED);
+        }
     }
                 
     return 1;

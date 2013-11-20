@@ -45,6 +45,7 @@ int     rval, i;
 #define USB_ERROR_IO        3
 
 #define USB_CMD_SPI         1
+#define USB_CMD_SET         2
 
 static int usbOpenDevice(usb_dev_handle **device, int vendor, char *vendorName, int product, char *productName)
 {
@@ -177,10 +178,10 @@ int main(int argc, char **argv)
             usage(argv[0]);
         }
 
-        char data[4] = {CMD_SET, method, index, level};
+        char data[3] = {method, index, level};
         nBytes = usb_control_msg(handle, 
             USB_TYPE_VENDOR | USB_RECIP_DEVICE | USB_ENDPOINT_OUT, 
-            USB_CMD_SPI, 
+            USB_CMD_SET, 
             0,
             0,
             data,

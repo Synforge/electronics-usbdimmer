@@ -8,27 +8,27 @@
 
 #include <util/delay.h>
 
-#define DIMMER_COUNT 2
-#define TRUE 1
-#define FALSE 0
+#define TRUE 			1
+#define FALSE 			0
 
-#define MAX_SIZE 2048
+#define MAX_SIZE 		2048
 
-#define DEBUG_DDR DDRC
-#define DEBUG_PORT PORTC
-#define DEBUG_LED PC5
+#define DEBUG_DDR 		DDRC
+#define DEBUG_PORT		PORTC
+#define DEBUG_LED 		PC5
 
-static const char CMD_SET = 0x01; // Set command e.g. [0x01 (command), 0x00(method), 0x01(index) 0xDF(level)]
+#define CMD_SET 		0x01
 
-static const char METHOD_SWITCH = 0x00;
-static const char METHOD_RAMP = 0x01;
+#define METHOD_SWITCH 	0x00
+#define METHOD_RAMP 	0x01
 
-struct dimmer {
-	volatile uint8_t level_cur;
-	volatile uint8_t level_req;
-	volatile uint8_t *port;
-	uint8_t mask;	
-} dimmers[DIMMER_COUNT];
+#define DIMMER_PORT		PORTD
+#define DIMMER_COUNT	2
+
+uint8_t dimmerMasks[2] = {(1<<PC0),(1<<PC1)};
+volatile uint8_t dimmerRequests[2] = {0,0};
+volatile uint8_t dimmerLevels[2] = {0,0};
+
 
 void initIO (void)
 {
@@ -39,7 +39,7 @@ void initIO (void)
 	EICRA = (1<<ISC01) | (0<<ISC00);
 	EIMSK |= (1<<INT0);
 
-	//Dimming Timer (TODO: Enable/Disable on Dimming request).
+	//Dimming Timer
 	TCCR0A = 	(1 << WGM01);
 	TCCR0B = 	((1 << CS02) | (1 << CS00));		// CTC Mode - Prescaler 1024
 	OCR0A = 	156;								// ~10ms
@@ -61,49 +61,48 @@ void initDimmers(void) {
 	DDRD = (1<<PD0) | (1<<PD1);
 	//Set the triacs off.
 	PORTD = 0x00;
-
-	dimmers[0].level_cur = 0;
-	dimmers[0].level_req = 0;
-	dimmers[0].port = &PORTD;
-	dimmers[0].mask = (1<<PD0);
-	
-	dimmers[1].level_cur = 0;
-	dimmers[1].level_req = 0;
-	dimmers[1].port = &PORTD;
-	dimmers[1].mask = (1<<PD1);
 }
+
+unsigned char *spi_read(uint8_t bytes, unsigned char c[]) 
+{
+	for(uint8_t i = 0; i < bytes; i++) {
+		while(!(SPSR & (1<<SPIF)));
+		c[i] = SPDR;
+	}
+
+	return c;
+} 
 
 int main (void)
 {
 	initIO(); //Setup IO pins and defaults
 	initDimmers(); //Set up the dimmers.
 
-	char commandBuffer[4];
-	uint8_t count = 0;
-
 	while(1) {
 
 		while(!(SPSR & (1<<SPIF)));
 
-        commandBuffer[count++] = SPDR;
+        if(SPDR == CMD_SET) {
+        	//Read the next 3 bytes
+        	unsigned char c[3];
+        	spi_read(3, c);
 
-        if(commandBuffer[0] == CMD_SET && count == 4) {
-        	//We have all our data        	
-        	if(commandBuffer[1] == METHOD_SWITCH) {
-        		switchToLevel((uint8_t)commandBuffer[2], (uint8_t)commandBuffer[3]);
+        	if(c[0] == METHOD_SWITCH) {
+        		switchToLevel((uint8_t)c[1], (uint8_t)c[2]);
         	} else {
-				rampToLevel((uint8_t)commandBuffer[2], (uint8_t)commandBuffer[3]);
+				rampToLevel((uint8_t)c[1], (uint8_t)c[2]);
         	}
 
-        	//Toggle the Debug LED
-        	DEBUG_PORT ^= (1 << DEBUG_LED);
-
-        	count = 0;
         }
 
 	}
 
 	return(0);
+}
+
+ISR(SPI_STC_vect)
+{
+	DEBUG_PORT = (1 << DEBUG_LED);
 }
 
 void rampToLevel(uint8_t index, uint8_t level) {
@@ -113,7 +112,7 @@ void rampToLevel(uint8_t index, uint8_t level) {
 	if(level < 0 ) 
 		level = 0;
 	
-	dimmers[index].level_req = level;
+	dimmerRequests[index] = level;
 }
 
 void switchToLevel(uint8_t index, uint8_t level) {
@@ -123,8 +122,8 @@ void switchToLevel(uint8_t index, uint8_t level) {
 	if(level < 0 ) 
 		level = 0;
 
-	dimmers[index].level_req = level;
-	dimmers[index].level_cur = level;
+	dimmerLevels[index] = level;
+	dimmerRequests[index] = level;
 }
 
 void debugLed(uint8_t state) {
@@ -144,23 +143,26 @@ ISR(INT0_vect) {
 //Zero Cross Timer Interrupt.
 ISR(TIMER1_COMPA_vect) {
 	count--;
+
 	for(uint8_t i = 0; i < DIMMER_COUNT; i++) {
-		if(dimmers[i].level_cur > 0 && dimmers[i].level_cur >= count) {
-			*dimmers[i].port |= dimmers[i].mask;
+		if(dimmerLevels[i] >= count) {
+			DIMMER_PORT |= dimmerMasks[i];
 			_delay_us(10);
-			*dimmers[i].port ^= dimmers[i].mask;
+	 		DIMMER_PORT ^= dimmerMasks[i];
 		}
 	}
+
 }
 
 //Dimming Interrupt
 ISR(TIMER0_COMPA_vect) {
+
 	for(uint8_t i = 0; i < DIMMER_COUNT; i++) {
-		if(dimmers[i].level_req > dimmers[i].level_cur) {
-			dimmers[i].level_cur++;
-		} else if(dimmers[i].level_req < dimmers[i].level_cur) {
-			dimmers[i].level_cur--;
+		if(dimmerRequests[i] > dimmerLevels[i]) {
+			dimmerLevels[i]++;
+		} else if(dimmerRequests[i] < dimmerLevels[i]) {
+			dimmerLevels[i]--;
 		}
-	
 	}
+
 }

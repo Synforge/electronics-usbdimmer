@@ -2,13 +2,14 @@ Archive member included because of file (symbol)
 
 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_exit.o)
                               /usr/lib/gcc/avr/4.7.2/../../../avr/lib/avr4/crtm48.o (exit)
+/usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_copy_data.o)
+                              dimmer.o (__do_copy_data)
 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_clear_bss.o)
                               dimmer.o (__do_clear_bss)
 
 Allocating common symbols
 Common symbol       size              file
 
-dimmers             0xa               dimmer.o
 count               0x2               dimmer.o
 
 Memory Configuration
@@ -122,7 +123,7 @@ LOAD /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a
 .rela.plt
  *(.rela.plt)
 
-.text           0x0000000000000000      0x2cc
+.text           0x0000000000000000      0x2a8
  *(.vectors)
  .vectors       0x0000000000000000       0x34 /usr/lib/gcc/avr/4.7.2/../../../avr/lib/avr4/crtm48.o
                 0x0000000000000000                __vectors
@@ -160,8 +161,10 @@ LOAD /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a
  *(.init3)
  *(.init3)
  *(.init4)
- .init4         0x0000000000000040       0x10 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_clear_bss.o)
-                0x0000000000000040                __do_clear_bss
+ .init4         0x0000000000000040       0x16 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_copy_data.o)
+                0x0000000000000040                __do_copy_data
+ .init4         0x0000000000000056       0x10 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_clear_bss.o)
+                0x0000000000000056                __do_clear_bss
  *(.init4)
  *(.init5)
  *(.init5)
@@ -172,75 +175,88 @@ LOAD /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a
  *(.init8)
  *(.init8)
  *(.init9)
- .init9         0x0000000000000050        0x4 /usr/lib/gcc/avr/4.7.2/../../../avr/lib/avr4/crtm48.o
+ .init9         0x0000000000000066        0x4 /usr/lib/gcc/avr/4.7.2/../../../avr/lib/avr4/crtm48.o
  *(.init9)
  *(.text)
- .text          0x0000000000000054        0x2 /usr/lib/gcc/avr/4.7.2/../../../avr/lib/avr4/crtm48.o
-                0x0000000000000054                __vector_22
-                0x0000000000000054                __vector_24
-                0x0000000000000054                __vector_12
-                0x0000000000000054                __bad_interrupt
-                0x0000000000000054                __vector_6
-                0x0000000000000054                __vector_3
-                0x0000000000000054                __vector_23
-                0x0000000000000054                __vector_25
-                0x0000000000000054                __vector_13
-                0x0000000000000054                __vector_17
-                0x0000000000000054                __vector_19
-                0x0000000000000054                __vector_7
-                0x0000000000000054                __vector_5
-                0x0000000000000054                __vector_4
-                0x0000000000000054                __vector_9
-                0x0000000000000054                __vector_2
-                0x0000000000000054                __vector_21
-                0x0000000000000054                __vector_15
-                0x0000000000000054                __vector_8
-                0x0000000000000054                __vector_10
-                0x0000000000000054                __vector_16
-                0x0000000000000054                __vector_18
-                0x0000000000000054                __vector_20
- .text          0x0000000000000056      0x218 dimmer.o
-                0x0000000000000056                initIO
-                0x000000000000008e                initDimmers
-                0x00000000000000c6                rampToLevel
-                0x00000000000000d6                switchToLevel
-                0x00000000000000e8                debugLed
-                0x00000000000000f2                __vector_1
-                0x0000000000000142                __vector_11
-                0x00000000000001fe                __vector_14
- .text          0x000000000000026e        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_exit.o)
- .text          0x000000000000026e        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_clear_bss.o)
-                0x000000000000026e                . = ALIGN (0x2)
+ .text          0x000000000000006a        0x2 /usr/lib/gcc/avr/4.7.2/../../../avr/lib/avr4/crtm48.o
+                0x000000000000006a                __vector_22
+                0x000000000000006a                __vector_24
+                0x000000000000006a                __vector_12
+                0x000000000000006a                __bad_interrupt
+                0x000000000000006a                __vector_6
+                0x000000000000006a                __vector_3
+                0x000000000000006a                __vector_23
+                0x000000000000006a                __vector_25
+                0x000000000000006a                __vector_13
+                0x000000000000006a                __vector_19
+                0x000000000000006a                __vector_7
+                0x000000000000006a                __vector_5
+                0x000000000000006a                __vector_4
+                0x000000000000006a                __vector_9
+                0x000000000000006a                __vector_2
+                0x000000000000006a                __vector_21
+                0x000000000000006a                __vector_15
+                0x000000000000006a                __vector_8
+                0x000000000000006a                __vector_10
+                0x000000000000006a                __vector_16
+                0x000000000000006a                __vector_18
+                0x000000000000006a                __vector_20
+ .text          0x000000000000006c      0x1f6 dimmer.o
+                0x000000000000006c                initIO
+                0x00000000000000a4                initDimmers
+                0x00000000000000ac                spi_read
+                0x00000000000000ca                __vector_17
+                0x00000000000000e6                rampToLevel
+                0x00000000000000f2                switchToLevel
+                0x0000000000000106                debugLed
+                0x0000000000000110                __vector_1
+                0x0000000000000160                __vector_11
+                0x00000000000001f2                __vector_14
+ .text          0x0000000000000262        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_exit.o)
+ .text          0x0000000000000262        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_copy_data.o)
+ .text          0x0000000000000262        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_clear_bss.o)
+                0x0000000000000262                . = ALIGN (0x2)
  *(.text.*)
- .text.startup  0x000000000000026e       0x5a dimmer.o
-                0x000000000000026e                main
+ .text.startup  0x0000000000000262       0x42 dimmer.o
+                0x0000000000000262                main
  .text.libgcc.mul
-                0x00000000000002c8        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_exit.o)
+                0x00000000000002a4        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_exit.o)
  .text.libgcc.div
-                0x00000000000002c8        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_exit.o)
- .text.libgcc   0x00000000000002c8        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_exit.o)
+                0x00000000000002a4        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_exit.o)
+ .text.libgcc   0x00000000000002a4        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_exit.o)
  .text.libgcc.prologue
-                0x00000000000002c8        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_exit.o)
+                0x00000000000002a4        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_exit.o)
  .text.libgcc.builtins
-                0x00000000000002c8        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_exit.o)
+                0x00000000000002a4        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_exit.o)
  .text.libgcc.fmul
-                0x00000000000002c8        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_exit.o)
+                0x00000000000002a4        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_exit.o)
  .text.libgcc.mul
-                0x00000000000002c8        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_clear_bss.o)
+                0x00000000000002a4        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_copy_data.o)
  .text.libgcc.div
-                0x00000000000002c8        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_clear_bss.o)
- .text.libgcc   0x00000000000002c8        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_clear_bss.o)
+                0x00000000000002a4        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_copy_data.o)
+ .text.libgcc   0x00000000000002a4        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_copy_data.o)
  .text.libgcc.prologue
-                0x00000000000002c8        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_clear_bss.o)
+                0x00000000000002a4        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_copy_data.o)
  .text.libgcc.builtins
-                0x00000000000002c8        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_clear_bss.o)
+                0x00000000000002a4        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_copy_data.o)
  .text.libgcc.fmul
-                0x00000000000002c8        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_clear_bss.o)
-                0x00000000000002c8                . = ALIGN (0x2)
+                0x00000000000002a4        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_copy_data.o)
+ .text.libgcc.mul
+                0x00000000000002a4        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_clear_bss.o)
+ .text.libgcc.div
+                0x00000000000002a4        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_clear_bss.o)
+ .text.libgcc   0x00000000000002a4        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_clear_bss.o)
+ .text.libgcc.prologue
+                0x00000000000002a4        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_clear_bss.o)
+ .text.libgcc.builtins
+                0x00000000000002a4        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_clear_bss.o)
+ .text.libgcc.fmul
+                0x00000000000002a4        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_clear_bss.o)
+                0x00000000000002a4                . = ALIGN (0x2)
  *(.fini9)
- .fini9         0x00000000000002c8        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_exit.o)
-                0x00000000000002c8                exit
-                0x00000000000002c8                _exit
+ .fini9         0x00000000000002a4        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_exit.o)
+                0x00000000000002a4                exit
+                0x00000000000002a4                _exit
  *(.fini9)
  *(.fini8)
  *(.fini8)
@@ -259,47 +275,51 @@ LOAD /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a
  *(.fini1)
  *(.fini1)
  *(.fini0)
- .fini0         0x00000000000002c8        0x4 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_exit.o)
+ .fini0         0x00000000000002a4        0x4 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_exit.o)
  *(.fini0)
-                0x00000000000002cc                _etext = .
+                0x00000000000002a8                _etext = .
 
-.data           0x0000000000800100        0x0 load address 0x00000000000002cc
+.data           0x0000000000800100        0x2 load address 0x00000000000002a8
                 0x0000000000800100                PROVIDE (__data_start, .)
  *(.data)
  .data          0x0000000000800100        0x0 /usr/lib/gcc/avr/4.7.2/../../../avr/lib/avr4/crtm48.o
- .data          0x0000000000800100        0x0 dimmer.o
- .data          0x0000000000800100        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_exit.o)
- .data          0x0000000000800100        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_clear_bss.o)
+ .data          0x0000000000800100        0x2 dimmer.o
+                0x0000000000800100                dimmerMasks
+ .data          0x0000000000800102        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_exit.o)
+ .data          0x0000000000800102        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_copy_data.o)
+ .data          0x0000000000800102        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_clear_bss.o)
  *(.data*)
  *(.rodata)
  *(.rodata*)
  *(.gnu.linkonce.d*)
-                0x0000000000800100                . = ALIGN (0x2)
-                0x0000000000800100                _edata = .
-                0x0000000000800100                PROVIDE (__data_end, .)
+                0x0000000000800102                . = ALIGN (0x2)
+                0x0000000000800102                _edata = .
+                0x0000000000800102                PROVIDE (__data_end, .)
 
-.bss            0x0000000000800100        0xc
-                0x0000000000800100                PROVIDE (__bss_start, .)
+.bss            0x0000000000800102        0x6
+                0x0000000000800102                PROVIDE (__bss_start, .)
  *(.bss)
- .bss           0x0000000000800100        0x0 /usr/lib/gcc/avr/4.7.2/../../../avr/lib/avr4/crtm48.o
- .bss           0x0000000000800100        0x0 dimmer.o
- .bss           0x0000000000800100        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_exit.o)
- .bss           0x0000000000800100        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_clear_bss.o)
+ .bss           0x0000000000800102        0x0 /usr/lib/gcc/avr/4.7.2/../../../avr/lib/avr4/crtm48.o
+ .bss           0x0000000000800102        0x4 dimmer.o
+                0x0000000000800102                dimmerLevels
+                0x0000000000800104                dimmerRequests
+ .bss           0x0000000000800106        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_exit.o)
+ .bss           0x0000000000800106        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_copy_data.o)
+ .bss           0x0000000000800106        0x0 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_clear_bss.o)
  *(.bss*)
  *(COMMON)
- COMMON         0x0000000000800100        0xc dimmer.o
-                0x0000000000800100                dimmers
-                0x000000000080010a                count
-                0x000000000080010c                PROVIDE (__bss_end, .)
-                0x00000000000002cc                __data_load_start = LOADADDR (.data)
-                0x00000000000002cc                __data_load_end = (__data_load_start + SIZEOF (.data))
+ COMMON         0x0000000000800106        0x2 dimmer.o
+                0x0000000000800106                count
+                0x0000000000800108                PROVIDE (__bss_end, .)
+                0x00000000000002a8                __data_load_start = LOADADDR (.data)
+                0x00000000000002aa                __data_load_end = (__data_load_start + SIZEOF (.data))
 
-.noinit         0x000000000080010c        0x0
-                0x000000000080010c                PROVIDE (__noinit_start, .)
+.noinit         0x0000000000800108        0x0
+                0x0000000000800108                PROVIDE (__noinit_start, .)
  *(.noinit*)
-                0x000000000080010c                PROVIDE (__noinit_end, .)
-                0x000000000080010c                _end = .
-                0x000000000080010c                PROVIDE (__heap_start, .)
+                0x0000000000800108                PROVIDE (__noinit_end, .)
+                0x0000000000800108                _end = .
+                0x0000000000800108                PROVIDE (__heap_start, .)
 
 .eeprom         0x0000000000810000        0x0
  *(.eeprom*)
@@ -362,39 +382,39 @@ LOAD /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a
 .debug_pubnames
  *(.debug_pubnames)
 
-.debug_info     0x0000000000000000      0x3d0
+.debug_info     0x0000000000000000      0x402
  *(.debug_info)
- .debug_info    0x0000000000000000      0x3d0 dimmer.o
+ .debug_info    0x0000000000000000      0x402 dimmer.o
  *(.gnu.linkonce.wi.*)
 
-.debug_abbrev   0x0000000000000000      0x232
+.debug_abbrev   0x0000000000000000      0x243
  *(.debug_abbrev)
- .debug_abbrev  0x0000000000000000      0x232 dimmer.o
+ .debug_abbrev  0x0000000000000000      0x243 dimmer.o
 
-.debug_line     0x0000000000000000      0x135
+.debug_line     0x0000000000000000      0x12b
  *(.debug_line)
- .debug_line    0x0000000000000000      0x135 dimmer.o
+ .debug_line    0x0000000000000000      0x12b dimmer.o
 
-.debug_frame    0x0000000000000000      0x134
+.debug_frame    0x0000000000000000      0x138
  *(.debug_frame)
- .debug_frame   0x0000000000000000      0x134 dimmer.o
+ .debug_frame   0x0000000000000000      0x138 dimmer.o
 
-.debug_str      0x0000000000000000      0x1a8
+.debug_str      0x0000000000000000      0x18e
  *(.debug_str)
- .debug_str     0x0000000000000000      0x1a8 dimmer.o
-                                        0x1e1 (size before relaxing)
+ .debug_str     0x0000000000000000      0x18e dimmer.o
+                                        0x1c2 (size before relaxing)
 
-.debug_loc      0x0000000000000000      0x2a4
+.debug_loc      0x0000000000000000      0x2ae
  *(.debug_loc)
- .debug_loc     0x0000000000000000      0x2a4 dimmer.o
+ .debug_loc     0x0000000000000000      0x2ae dimmer.o
 
 .debug_macinfo
  *(.debug_macinfo)
 OUTPUT(dimmer.elf elf32-avr)
 LOAD linker stubs
 
-.debug_ranges   0x0000000000000000       0x30
- .debug_ranges  0x0000000000000000       0x30 dimmer.o
+.debug_ranges   0x0000000000000000       0x60
+ .debug_ranges  0x0000000000000000       0x60 dimmer.o
 
 Cross Reference Table
 
@@ -402,7 +422,12 @@ Symbol                                            File
 __bad_interrupt                                   /usr/lib/gcc/avr/4.7.2/../../../avr/lib/avr4/crtm48.o
 __bss_end                                         /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_clear_bss.o)
 __bss_start                                       /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_clear_bss.o)
+__data_end                                        /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_copy_data.o)
+__data_load_start                                 /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_copy_data.o)
+__data_start                                      /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_copy_data.o)
 __do_clear_bss                                    /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_clear_bss.o)
+                                                  dimmer.o
+__do_copy_data                                    /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_copy_data.o)
                                                   dimmer.o
 __heap_end                                        /usr/lib/gcc/avr/4.7.2/../../../avr/lib/avr4/crtm48.o
 __init                                            /usr/lib/gcc/avr/4.7.2/../../../avr/lib/avr4/crtm48.o
@@ -418,7 +443,8 @@ __vector_14                                       dimmer.o
                                                   /usr/lib/gcc/avr/4.7.2/../../../avr/lib/avr4/crtm48.o
 __vector_15                                       /usr/lib/gcc/avr/4.7.2/../../../avr/lib/avr4/crtm48.o
 __vector_16                                       /usr/lib/gcc/avr/4.7.2/../../../avr/lib/avr4/crtm48.o
-__vector_17                                       /usr/lib/gcc/avr/4.7.2/../../../avr/lib/avr4/crtm48.o
+__vector_17                                       dimmer.o
+                                                  /usr/lib/gcc/avr/4.7.2/../../../avr/lib/avr4/crtm48.o
 __vector_18                                       /usr/lib/gcc/avr/4.7.2/../../../avr/lib/avr4/crtm48.o
 __vector_19                                       /usr/lib/gcc/avr/4.7.2/../../../avr/lib/avr4/crtm48.o
 __vector_2                                        /usr/lib/gcc/avr/4.7.2/../../../avr/lib/avr4/crtm48.o
@@ -440,7 +466,9 @@ __vectors                                         /usr/lib/gcc/avr/4.7.2/../../.
 _exit                                             /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_exit.o)
 count                                             dimmer.o
 debugLed                                          dimmer.o
-dimmers                                           dimmer.o
+dimmerLevels                                      dimmer.o
+dimmerMasks                                       dimmer.o
+dimmerRequests                                    dimmer.o
 exit                                              /usr/lib/gcc/avr/4.7.2/avr4/libgcc.a(_exit.o)
                                                   /usr/lib/gcc/avr/4.7.2/../../../avr/lib/avr4/crtm48.o
 initDimmers                                       dimmer.o
@@ -448,4 +476,5 @@ initIO                                            dimmer.o
 main                                              dimmer.o
                                                   /usr/lib/gcc/avr/4.7.2/../../../avr/lib/avr4/crtm48.o
 rampToLevel                                       dimmer.o
+spi_read                                          dimmer.o
 switchToLevel                                     dimmer.o
