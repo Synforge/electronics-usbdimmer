@@ -40,7 +40,7 @@
 
 
 # MCU name
-MCU = atmega48
+MCU = atmega328p
 
 
 # Processor frequency.
@@ -475,6 +475,8 @@ extcoff: $(TARGET).elf
 %.i : %.c
 	$(CC) -E -mmcu=$(MCU) -I. $(CFLAGS) $< -o $@ 
 
+fuse: 
+	$(AVRDUDE) $(AVRDUDE_FLAGS) -U hfuse:w:0xde:m -U lfuse:w:0xe0:m
 
 # Target: clean project.
 clean: begin clean_list end

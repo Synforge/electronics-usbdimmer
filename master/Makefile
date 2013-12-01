@@ -56,9 +56,8 @@ flash:	all
 #        | | +---------------- SPIEN (enable serial programming -> enabled)
 #        | +------------------ EESAVE (preserve EEPROM on Chip Erase -> not preserved)
 #        +-------------------- DWEN (debug wire enable)
-fuse_tiny2313:	# only needed for attiny2313
-	$(AVRDUDE) -U hfuse:w:0xdb:m -U lfuse:w:0xef:m
-
+fuse:
+	$(AVRDUDE) -U hfuse:w:0xde:m -U lfuse:w:0x9f:m
 
 clean:
 	rm -f main.hex main.lst main.obj main.cof main.list main.map main.eep.hex main.bin *.o usbdrv/*.o main.s usbdrv/oddebug.s usbdrv/usbdrv.s

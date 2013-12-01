@@ -8,6 +8,8 @@
  * This Revision: $Id$
  */
 
+ #define F_CPU 12000000UL  // 1 MHz
+
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/pgmspace.h>
@@ -66,19 +68,27 @@ USB_PUBLIC uchar usbFunctionWrite(uchar *data, uchar len) {
     uchar i;
 
     if(currentMethod == USB_CMD_SPI) {
+        //Select the slave
+        PORTB &= ~(1<<PB2);
         for(i = 0; i < len; i++) {
             spi_putbyte(data[i]);
         }
+        //Deselect the slave.
+        PORTB |= (1<<PB2);
     } else
     if(currentMethod == USB_CMD_SET) {
 
         if(len == 3) {
+            //Select the slave
+            PORTB &= ~(1<<PB2);
+
             spi_putbyte(CMD_SET);
             spi_putbyte(data[0]);
             spi_putbyte(data[1]);
             spi_putbyte(data[2]);
 
-            DEBUG_PORT ^= (1<<DEBUG_LED);
+            //Deselect the slave.
+            PORTB |= (1<<PB2);
         }
     }
                 
@@ -94,12 +104,15 @@ void initIO (void)
     DEBUG_DDR = (1<<DEBUG_LED);
 
     //Set up SPI
-    DDRB |= (1<<2)|(1<<3)|(1<<5);    // SCK, MOSI and SS as outputs
-    DDRB &= ~(1<<4);                 // MISO as input
+    DDRB |= (1<<PB2)|(1<<PB3)|(1<<PB5);     // SCK, MOSI and SS as outputs
+    DDRB &= ~(1<<PB4);                      // MISO as input
 
-    SPCR |= (1<<MSTR);               // Set as Master
-    SPCR |= (1<<SPR0)|(1<<SPR1);     // divided clock by 128
-    SPCR |= (1<<SPE);                // Enable SPI
+    //Deselect the slave
+    PORTB |= (1<<PB2);
+
+    SPCR |= (1<<MSTR);                      // Set as Master
+    SPCR |= (1<<SPR0)|(1<<SPR1);            // divided clock by 128
+    SPCR |= (1<<SPE);                       // Enable SPI
 }
 
 int main(void)

@@ -4,8 +4,7 @@ dimmer.o: dimmer.c dimmer.h \
  /usr/lib/gcc/avr/4.7.2/../../../avr/include/inttypes.h \
  /usr/lib/gcc/avr/4.7.2/include/stdint.h \
  /usr/lib/gcc/avr/4.7.2/../../../avr/include/stdint.h \
- /usr/lib/gcc/avr/4.7.2/../../../avr/include/avr/iom48.h \
- /usr/lib/gcc/avr/4.7.2/../../../avr/include/avr/iomx8.h \
+ /usr/lib/gcc/avr/4.7.2/../../../avr/include/avr/iom328p.h \
  /usr/lib/gcc/avr/4.7.2/../../../avr/include/avr/portpins.h \
  /usr/lib/gcc/avr/4.7.2/../../../avr/include/avr/common.h \
  /usr/lib/gcc/avr/4.7.2/../../../avr/include/avr/version.h \
@@ -32,9 +31,7 @@ dimmer.h:
 
 /usr/lib/gcc/avr/4.7.2/../../../avr/include/stdint.h:
 
-/usr/lib/gcc/avr/4.7.2/../../../avr/include/avr/iom48.h:
-
-/usr/lib/gcc/avr/4.7.2/../../../avr/include/avr/iomx8.h:
+/usr/lib/gcc/avr/4.7.2/../../../avr/include/avr/iom328p.h:
 
 /usr/lib/gcc/avr/4.7.2/../../../avr/include/avr/portpins.h:
 
