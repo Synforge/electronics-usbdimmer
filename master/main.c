@@ -26,9 +26,13 @@
 
 #define USB_CMD_SPI     1
 #define USB_CMD_SET     2
+#define USB_CMD_INC	3
+#define USB_CMD_DEC	4
 
 #define CMD_STATUS      0x00 //Obtain the status of the dimmer channels
 #define CMD_SET         0x01 //Set a dimmer channel
+#define CMD_INC		0x02 //Increment a channel
+#define CMD_DEC         0x03 //Decrement a channel
 
 #define METHOD_SWITCH   0x00
 #define METHOD_RAMP     0x01
@@ -58,9 +62,10 @@ USB_PUBLIC uchar usbFunctionSetup(uchar data[8])
     if(rq->bRequest == USB_CMD_SPI) {
         return USB_NO_MSG;
     } else 
-    if(rq->bRequest == USB_CMD_SET) {
+    if(rq->bRequest == USB_CMD_SET || rq->bRequest == USB_CMD_INC || rq->bRequest == USB_CMD_DEC) {
         return USB_NO_MSG;
     }
+
     return 0;
 }
 
@@ -90,8 +95,26 @@ USB_PUBLIC uchar usbFunctionWrite(uchar *data, uchar len) {
             //Deselect the slave.
             PORTB |= (1<<PB2);
         }
+    } else
+    if(currentMethod == USB_CMD_INC || currentMethod == USB_CMD_DEC) {
+        if(len == 3) {
+            //Select the slave.
+            PORTB &= ~(1<<PB2);
+
+            int command = CMD_INC;
+            if(currentMethod == USB_CMD_DEC) {
+                command = CMD_DEC;
+            }
+
+            spi_putbyte(command);
+            spi_putbyte(data[0]);
+            spi_putbyte(data[1]);
+            spi_putbyte(data[2]);
+
+            //Deselect the slave.
+            PORTB |= (1<<PB2);
+        }
     }
-                
     return 1;
 }
 

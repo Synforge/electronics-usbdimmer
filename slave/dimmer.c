@@ -18,11 +18,13 @@
 #define DEBUG_LED 		PC5
 
 #define CMD_SET 		0x01
+#define CMD_INC                 0x02
+#define CMD_DEC                 0x03
 
 #define METHOD_SWITCH 	0x00
 #define METHOD_RAMP 	0x01
 
-#define DIMMER_COUNT	8
+#define DIMMER_COUNT	2
 
 uint8_t dimmerMasks[] = {(1<<PD0),(1<<PD1),(1<<PD3), (1<<PD4), (1<<PD5), (1<<PD6), (1<<PD7), (1<<PB0)};
 volatile uint8_t dimmerRequests[] = {0,0,0,0,0,0,0,0};
@@ -39,10 +41,10 @@ void initIO (void)
 	EIMSK |= (1<<INT0);
 
 	//Dimming Timer
-	// TCCR0A = 	(1 << WGM01);
-	// TCCR0B = 	((1 << CS02) | (1 << CS00));		// CTC Mode - Prescaler 1024
-	// OCR0A = 	156;								// ~10ms
-	// TIMSK0 = 	(1 << OCIE0A);
+	TCCR0A = 	(1 << WGM01);
+	TCCR0B = 	((1 << CS02) | (1 << CS00));		// CTC Mode - Prescaler 1024
+	OCR0A = 	156;								// ~10ms
+	TIMSK0 = 	(1 << OCIE0A);
 
 	//Set up SPI
 	DDRB &= ~((1<<2)|(1<<3)|(1<<5));   // SCK, MOSI and SS as inputs
@@ -83,18 +85,53 @@ int main (void)
 
 		while(!(SPSR & (1<<SPIF)));
 
-        if(SPDR == CMD_SET) {
-        	//Read the next 3 bytes
-        	unsigned char c[3];
-        	spi_read(3, c);
+                uint8_t command = SPDR;
 
-        	// if(c[0] == METHOD_SWITCH) {
-        		switchToLevel((uint8_t)c[1], (uint8_t)c[2]);
-    //     	} else {
-				// rampToLevel((uint8_t)c[1], (uint8_t)c[2]);
-    //     	}
+        	if(command == CMD_SET) {
+        		//Read the next 3 bytes
+        		unsigned char c[3];
+        		spi_read(3, c);
 
-        }
+        		if(c[0] == METHOD_SWITCH) {
+        			switchToLevel((uint8_t)c[1], (uint8_t)c[2]);
+         		} else {
+				rampToLevel((uint8_t)c[1], (uint8_t)c[2]);
+         		}
+
+        	} else 
+                if(command == CMD_INC || command == CMD_DEC) {
+		    if(command == CMD_INC) {
+			DEBUG_PORT ^= (1<<DEBUG_LED);
+		    }
+
+                    //Read the next 3 bytes
+		    unsigned char c[3];
+                    spi_read(3, c);
+
+                    int16_t cur = dimmerLevels[c[1]];
+
+                    if(command == CMD_INC) {
+                        cur += c[2];
+                    } else {
+                        cur -= c[2];
+                    }
+
+                    if(cur > 255) {
+                        cur = 255;
+                    }
+
+
+                    if(cur < 0) {
+                        cur = 0;
+                    }
+
+
+                    if(c[0] == METHOD_SWITCH) {
+                        switchToLevel((uint8_t)c[1], cur);
+                    } else {
+			rampToLevel((uint8_t)c[1], cur);
+                    }
+                }
 
 	}
 
@@ -109,8 +146,6 @@ void rampToLevel(uint8_t index, uint8_t level) {
 		level = 0;
 	
 	dimmerRequests[index] = level;
-
-	DEBUG_PORT = (1<<DEBUG_LED);
 }
 
 void switchToLevel(uint8_t index, uint8_t level) {
@@ -154,7 +189,20 @@ ISR(TIMER1_COMPA_vect) {
 				PORTB &= ~dimmerMasks[i];
 			} else {
 				PORTD &= ~dimmerMasks[i];
-			} 
+			}
 		}
 	}
+}
+
+//Dimming Interrupt
+ISR(TIMER0_COMPA_vect) {
+
+        for(uint8_t i = 0; i < DIMMER_COUNT; i++) {
+                if(dimmerRequests[i] > dimmerLevels[i]) {
+                        dimmerLevels[i]++;
+                } else if(dimmerRequests[i] < dimmerLevels[i]) {
+                        dimmerLevels[i]--;
+                }
+        }
+
 }
